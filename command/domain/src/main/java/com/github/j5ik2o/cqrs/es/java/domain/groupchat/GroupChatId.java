@@ -1,6 +1,7 @@
 package com.github.j5ik2o.cqrs.es.java.domain.groupchat;
 
 import com.github.f4b6a3.ulid.Ulid;
+import com.github.f4b6a3.ulid.UlidCreator;
 import com.github.j5ik2o.event.store.adapter.java.AggregateId;
 import java.util.Objects;
 import javax.annotation.Nonnull;
@@ -65,5 +66,9 @@ public final class GroupChatId implements AggregateId {
       value = value.substring((TYPE_NAME + "-").length());
     }
     return new GroupChatId(Ulid.from(value));
+  }
+
+  public static GroupChatId generate() {
+    return GroupChatId.of(UlidCreator.getMonotonicUlid());
   }
 }

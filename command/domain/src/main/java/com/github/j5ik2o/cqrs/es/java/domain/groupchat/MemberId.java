@@ -48,6 +48,6 @@ public final class MemberId {
   }
 
   public static MemberId generate() {
-    return new MemberId(UlidCreator.getUlid());
+    return new MemberId(UlidCreator.getMonotonicUlid());
   }
 }

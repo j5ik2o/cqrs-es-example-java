@@ -12,7 +12,8 @@ public sealed interface GroupChatEvent extends Event<GroupChatId>
         GroupChatEvent.Renamed,
         GroupChatEvent.MemberAdded,
         GroupChatEvent.MemberRemoved,
-GroupChatEvent.MessagePosted, GroupChatEvent.MessageRemoved {
+        GroupChatEvent.MessagePosted,
+        GroupChatEvent.MessageDeleted {
 
   @Nonnull
   Ulid id();
@@ -120,7 +121,7 @@ GroupChatEvent.MessagePosted, GroupChatEvent.MessageRemoved {
       Instant occurredAt)
       implements GroupChatEvent {}
 
-  record MessageRemoved(
+  record MessageDeleted(
       Ulid id,
       GroupChatId aggregateId,
       Message message,
