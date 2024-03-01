@@ -1,7 +1,10 @@
 package com.github.j5ik2o.cqrs.es.java.domain.groupchat;
 
+import com.github.f4b6a3.ulid.UlidCreator;
 import com.github.j5ik2o.cqrs.es.java.domain.useraccount.UserAccountId;
 import com.github.j5ik2o.event.store.adapter.java.Aggregate;
+import io.vavr.Tuple2;
+import java.time.Instant;
 import javax.annotation.Nonnull;
 
 public class GroupChat implements Aggregate<GroupChat, GroupChatId> {
@@ -61,9 +64,27 @@ public class GroupChat implements Aggregate<GroupChat, GroupChatId> {
     return name;
   }
 
-  public static GroupChat create(GroupChatId id, GroupChatName name, UserAccountId executorId) {
-    return new GroupChat(
-        id, false, name, Members.ofAdministratorId(executorId), Messages.ofEmpty(), 0, 0);
+  public static Tuple2<GroupChat, GroupChatEvent> create(
+      GroupChatId id, GroupChatName name, UserAccountId executorId) {
+    long sequenceNumber = 1;
+    long version = 1;
+    return new Tuple2<>(
+        new GroupChat(
+            id,
+            false,
+            name,
+            Members.ofAdministratorId(executorId),
+            Messages.ofEmpty(),
+            sequenceNumber,
+            version),
+        new GroupChatEvent.Created(
+            UlidCreator.getMonotonicUlid(),
+            id,
+            executorId,
+            name,
+            Members.ofAdministratorId(executorId),
+            sequenceNumber,
+            Instant.now()));
   }
 
   public static GroupChat from(
