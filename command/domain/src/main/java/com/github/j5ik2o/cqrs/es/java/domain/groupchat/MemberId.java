@@ -1,14 +1,16 @@
 package com.github.j5ik2o.cqrs.es.java.domain.groupchat;
 
+import com.fasterxml.jackson.annotation.JsonProperty;
 import com.github.f4b6a3.ulid.Ulid;
 import com.github.f4b6a3.ulid.UlidCreator;
 import java.util.Objects;
 import javax.annotation.Nonnull;
 
 public final class MemberId {
+  @JsonProperty("value")
   private final Ulid value;
 
-  private MemberId(Ulid value) {
+  private MemberId(@Nonnull @JsonProperty("value") Ulid value) {
     this.value = value;
   }
 

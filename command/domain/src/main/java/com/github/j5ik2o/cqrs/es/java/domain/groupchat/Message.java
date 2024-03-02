@@ -1,5 +1,6 @@
 package com.github.j5ik2o.cqrs.es.java.domain.groupchat;
 
+import com.fasterxml.jackson.annotation.JsonProperty;
 import com.github.j5ik2o.cqrs.es.java.domain.useraccount.UserAccountId;
 import java.time.LocalDateTime;
 import java.util.Objects;
@@ -13,7 +14,11 @@ public final class Message {
 
   private final LocalDateTime createdAt;
 
-  private Message(MessageId id, String content, UserAccountId senderId, LocalDateTime createdAt) {
+  private Message(
+      @Nonnull @JsonProperty("id") MessageId id,
+      @Nonnull @JsonProperty("content") String content,
+      @Nonnull @JsonProperty("senderId") UserAccountId senderId,
+      @Nonnull @JsonProperty("createdAt") LocalDateTime createdAt) {
     this.id = id;
     this.content = content;
     this.senderId = senderId;

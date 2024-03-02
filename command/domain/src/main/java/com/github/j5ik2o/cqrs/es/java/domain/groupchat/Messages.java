@@ -1,14 +1,17 @@
 package com.github.j5ik2o.cqrs.es.java.domain.groupchat;
 
+import com.fasterxml.jackson.annotation.JsonProperty;
 import io.vavr.Tuple2;
 import io.vavr.collection.Vector;
 import io.vavr.control.Option;
 import java.util.Objects;
+import javax.annotation.Nonnull;
 
 public final class Messages {
+  @JsonProperty("values")
   private final Vector<Message> values;
 
-  private Messages(Vector<Message> values) {
+  private Messages(@Nonnull @JsonProperty("values") Vector<Message> values) {
     this.values = values;
   }
 
@@ -34,6 +37,7 @@ public final class Messages {
     return values.size();
   }
 
+  @JsonProperty(access = JsonProperty.Access.READ_ONLY)
   public boolean isEmpty() {
     return values.isEmpty();
   }
@@ -70,5 +74,9 @@ public final class Messages {
 
   public static Messages of(Message... values) {
     return new Messages(Vector.of(values));
+  }
+
+  public static Messages from(Vector<Message> values) {
+    return new Messages(values);
   }
 }
