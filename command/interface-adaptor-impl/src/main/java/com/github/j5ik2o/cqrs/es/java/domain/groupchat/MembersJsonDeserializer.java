@@ -9,11 +9,11 @@ import io.vavr.collection.Vector;
 import java.io.IOException;
 import java.util.List;
 
-public class MessagesDeserializer extends JsonDeserializer<Messages> {
+public final class MembersJsonDeserializer extends JsonDeserializer<Members> {
   @Override
-  public Messages deserialize(JsonParser jsonParser, DeserializationContext deserializationContext)
+  public Members deserialize(JsonParser jsonParser, DeserializationContext deserializationContext)
       throws IOException, JacksonException {
-    List<Message> list = jsonParser.readValueAs(new TypeReference<List<Message>>() {});
-    return Messages.from(Vector.ofAll(list));
+    List<Member> list = jsonParser.readValueAs(new TypeReference<List<Member>>() {});
+    return Members.from(Vector.ofAll(list));
   }
 }

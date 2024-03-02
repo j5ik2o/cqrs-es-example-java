@@ -7,7 +7,7 @@ import com.fasterxml.jackson.databind.JsonDeserializer;
 import com.github.f4b6a3.ulid.Ulid;
 import java.io.IOException;
 
-public class UlidDeserializer extends JsonDeserializer<Ulid> {
+public final class UlidJsonDeserializer extends JsonDeserializer<Ulid> {
   @Override
   public Ulid deserialize(JsonParser jsonParser, DeserializationContext deserializationContext)
       throws IOException, JacksonException {

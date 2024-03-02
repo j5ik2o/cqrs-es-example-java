@@ -3,14 +3,13 @@ package com.github.j5ik2o.cqrs.es.java.domain.groupchat;
 import com.fasterxml.jackson.core.JsonGenerator;
 import com.fasterxml.jackson.databind.JsonSerializer;
 import com.fasterxml.jackson.databind.SerializerProvider;
-import com.github.f4b6a3.ulid.Ulid;
 import java.io.IOException;
 
-public class UlidSerializer extends JsonSerializer<Ulid> {
+public final class MessagesJsonSerializer extends JsonSerializer<Messages> {
   @Override
   public void serialize(
-      Ulid ulid, JsonGenerator jsonGenerator, SerializerProvider serializerProvider)
+      Messages messages, JsonGenerator jsonGenerator, SerializerProvider serializerProvider)
       throws IOException {
-    jsonGenerator.writeString(ulid.toString());
+    jsonGenerator.writeObject(messages.toVector().toJavaList());
   }
 }

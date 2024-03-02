@@ -10,17 +10,18 @@ import com.github.j5ik2o.event.store.adapter.java.SnapshotSerializer;
 import java.io.IOException;
 import javax.annotation.Nonnull;
 
-public class GroupChatSnapshotSerializer implements SnapshotSerializer<GroupChatId, GroupChat> {
+public final class GroupChatSnapshotSerializer
+    implements SnapshotSerializer<GroupChatId, GroupChat> {
   private static final ObjectMapper objectMapper = new ObjectMapper();
 
   private static void configureModule() {
     SimpleModule module = new SimpleModule();
-    module.addSerializer(Ulid.class, new UlidSerializer());
-    module.addDeserializer(Ulid.class, new UlidDeserializer());
-    module.addSerializer(Members.class, new MembersSerializer());
-    module.addDeserializer(Members.class, new MembersDeserializer());
-    module.addSerializer(Messages.class, new MessagesSerializer());
-    module.addDeserializer(Messages.class, new MessagesDeserializer());
+    module.addSerializer(Ulid.class, new UlidJsonSerializer());
+    module.addDeserializer(Ulid.class, new UlidJsonDeserializer());
+    module.addSerializer(Members.class, new MembersJsonSerializer());
+    module.addDeserializer(Members.class, new MembersJsonDeserializer());
+    module.addSerializer(Messages.class, new MessagesJsonSerializer());
+    module.addDeserializer(Messages.class, new MessagesJsonDeserializer());
     objectMapper.registerModule(module);
     objectMapper.findAndRegisterModules();
   }
