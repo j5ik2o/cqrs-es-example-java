@@ -54,8 +54,8 @@ subprojects {
     dependencies {
         implementation("com.google.code.findbugs:jsr305:3.0.2")
         implementation("org.projectlombok:lombok:1.18.22")
-        testImplementation("org.junit.jupiter:junit-jupiter-api:5.8.1")
-        testRuntimeOnly("org.junit.jupiter:junit-jupiter-engine:5.8.1")
+        testImplementation("org.junit.jupiter:junit-jupiter-api:5.10.2")
+        testRuntimeOnly("org.junit.jupiter:junit-jupiter-engine:5.10.2")
         implementation("io.vavr:vavr:0.10.4")
 
         testImplementation("org.springframework.boot:spring-boot-testcontainers")
