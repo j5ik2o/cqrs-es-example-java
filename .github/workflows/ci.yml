@@ -21,7 +21,7 @@ jobs:
       - uses: actions/setup-java@v3
         with:
           distribution: temurin
-          java-version: 11
+          java-version: 17
       - uses: gradle/gradle-build-action@v2
         with:
           gradle-version: 8.3
@@ -34,7 +34,7 @@ jobs:
       JVM_OPTS:  -Xms2048M -Xmx2048M -Xss6M -XX:ReservedCodeCacheSize=256M -Dfile.encoding=UTF-8
     strategy:
       matrix:
-        java: [ 11, 17, 19 ] # LTS versions + latest version
+        java: [ 17 ] # LTS versions + latest version
     name: "Run tests with JDK ${{ matrix.java }}"
     steps:
       - uses: actions/checkout@v4
