@@ -90,7 +90,7 @@ project(":infrastructure") {
 
 project(":command:domain") {
     dependencies {
-        implementation("com.github.j5ik2o:event-store-adapter-java:1.1.104")
+        implementation("com.github.j5ik2o:event-store-adapter-java:1.1.105")
         implementation(project(":infrastructure"))
         implementation("com.github.f4b6a3:ulid-creator:5.2.3")
         implementation("com.fasterxml.jackson.core:jackson-databind:2.16.1")
@@ -113,7 +113,7 @@ project(":command:interface-adaptor-impl") {
         implementation(project(":infrastructure"))
         implementation(project(":command:domain"))
         implementation(project(":command:interface-adaptor-if"))
-        implementation("com.github.j5ik2o:event-store-adapter-java:1.1.104")
+        implementation("com.github.j5ik2o:event-store-adapter-java:1.1.105")
         implementation("com.github.f4b6a3:ulid-creator:5.2.3")
 
         implementation("org.springframework.boot:spring-boot-starter-graphql")
