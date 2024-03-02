@@ -129,7 +129,7 @@ project(":command:interface-adaptor-impl") {
         testImplementation("org.testcontainers:localstack:1.19.2")
         testImplementation("org.testcontainers:mysql:1.17.3")
 
-        testImplementation("software.amazon.awssdk:dynamodb:2.21.26")
+        testImplementation("software.amazon.awssdk:dynamodb:2.25.1")
     }
 }
 
