@@ -5,11 +5,11 @@ import com.fasterxml.jackson.databind.JsonSerializer;
 import com.fasterxml.jackson.databind.SerializerProvider;
 import java.io.IOException;
 
-public class MessagesSerializer extends JsonSerializer<Messages> {
+public final class MembersJsonSerializer extends JsonSerializer<Members> {
   @Override
   public void serialize(
-      Messages messages, JsonGenerator jsonGenerator, SerializerProvider serializerProvider)
+      Members members, JsonGenerator jsonGenerator, SerializerProvider serializerProvider)
       throws IOException {
-    jsonGenerator.writeObject(messages.toVector().toJavaList());
+    jsonGenerator.writeObject(members.toVector().toJavaList());
   }
 }
