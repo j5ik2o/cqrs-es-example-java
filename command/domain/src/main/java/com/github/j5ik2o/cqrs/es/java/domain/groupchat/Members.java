@@ -1,15 +1,18 @@
 package com.github.j5ik2o.cqrs.es.java.domain.groupchat;
 
+import com.fasterxml.jackson.annotation.JsonProperty;
 import com.github.j5ik2o.cqrs.es.java.domain.useraccount.UserAccountId;
 import io.vavr.Tuple2;
 import io.vavr.collection.Vector;
 import io.vavr.control.Option;
 import java.util.Objects;
+import javax.annotation.Nonnull;
 
 public final class Members {
+  @JsonProperty("values")
   private final Vector<Member> values;
 
-  private Members(Vector<Member> values) {
+  private Members(@Nonnull @JsonProperty("values") Vector<Member> values) {
     this.values = values;
   }
 
@@ -31,6 +34,7 @@ public final class Members {
     return values.exists(member -> member.getUserAccountId().equals(userAccountId));
   }
 
+  @JsonProperty(access = JsonProperty.Access.READ_ONLY)
   public boolean isMember(UserAccountId userAccountId) {
     return values.exists(
         member ->
@@ -38,6 +42,7 @@ public final class Members {
                 && member.getRole() == MemberRole.MEMBER);
   }
 
+  @JsonProperty(access = JsonProperty.Access.READ_ONLY)
   public boolean isAdministrator(UserAccountId userAccountId) {
     return values.exists(
         member ->
@@ -73,6 +78,10 @@ public final class Members {
 
   public static Members of(Member head, Member... tail) {
     return new Members(Vector.of(tail).prepend(head));
+  }
+
+  public static Members from(Vector<Member> values) {
+    return new Members(values);
   }
 
   public static Members ofAdministratorId(UserAccountId userAccountId) {

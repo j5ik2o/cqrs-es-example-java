@@ -59,6 +59,7 @@ subprojects {
         implementation("io.vavr:vavr:0.10.4")
 
         testImplementation("org.springframework.boot:spring-boot-testcontainers")
+        testImplementation("org.testcontainers:junit-jupiter")
 
         testImplementation("org.springframework.boot:spring-boot-starter-test")
         testImplementation("org.springframework.graphql:spring-graphql-test")
@@ -93,6 +94,7 @@ project(":command:domain") {
         implementation(project(":infrastructure"))
         implementation("com.github.f4b6a3:ulid-creator:5.2.3")
         implementation("com.fasterxml.jackson.core:jackson-databind:2.16.1")
+        implementation("com.fasterxml.jackson.core:jackson-annotations:2.16.1")
         implementation("com.fasterxml.jackson.datatype:jackson-datatype-jsr310:2.16.1")
     }
 }
@@ -100,6 +102,9 @@ project(":command:domain") {
 project(":command:interface-adaptor-if") {
     dependencies {
         implementation(project(":infrastructure"))
+        implementation(project(":command:domain"))
+        implementation("com.fasterxml.jackson.core:jackson-annotations:2.16.1")
+        implementation("com.fasterxml.jackson.datatype:jackson-datatype-jsr310:2.16.1")
     }
 }
 
@@ -108,6 +113,8 @@ project(":command:interface-adaptor-impl") {
         implementation(project(":infrastructure"))
         implementation(project(":command:domain"))
         implementation(project(":command:interface-adaptor-if"))
+        implementation("com.github.j5ik2o:event-store-adapter-java:1.1.104")
+        implementation("com.github.f4b6a3:ulid-creator:5.2.3")
 
         implementation("org.springframework.boot:spring-boot-starter-graphql")
         testImplementation("org.springframework:spring-webflux")
@@ -118,6 +125,11 @@ project(":command:interface-adaptor-impl") {
 
         testImplementation("org.flywaydb:flyway-core:8.5.13")
         testImplementation("org.flywaydb:flyway-mysql:8.5.13")
+
+        testImplementation("org.testcontainers:localstack:1.19.2")
+        testImplementation("org.testcontainers:mysql:1.17.3")
+
+        testImplementation("software.amazon.awssdk:dynamodb:2.21.26")
     }
 }
 

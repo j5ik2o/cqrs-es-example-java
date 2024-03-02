@@ -1,16 +1,27 @@
 package com.github.j5ik2o.cqrs.es.java.domain.groupchat;
 
+import com.fasterxml.jackson.annotation.JsonProperty;
 import com.github.j5ik2o.cqrs.es.java.domain.useraccount.UserAccountId;
 import java.util.Objects;
 import javax.annotation.Nonnull;
 
 public final class Member {
+  @Nonnull
+  @JsonProperty("id")
   private final MemberId id;
+
+  @Nonnull
+  @JsonProperty("userAccountId")
   private final UserAccountId userAccountId;
 
+  @Nonnull
+  @JsonProperty("role")
   private final MemberRole role;
 
-  private Member(MemberId id, UserAccountId userAccountId, MemberRole role) {
+  private Member(
+      @Nonnull @JsonProperty("id") MemberId id,
+      @Nonnull @JsonProperty("userAccountId") UserAccountId userAccountId,
+      @Nonnull @JsonProperty("role") MemberRole role) {
     this.id = id;
     this.userAccountId = userAccountId;
     this.role = role;

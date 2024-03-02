@@ -5,8 +5,10 @@ import com.github.f4b6a3.ulid.UlidCreator;
 import com.github.j5ik2o.cqrs.es.java.domain.useraccount.UserAccountId;
 import com.github.j5ik2o.event.store.adapter.java.Aggregate;
 import io.vavr.Tuple2;
+import io.vavr.collection.Vector;
 import io.vavr.control.Either;
 import java.time.Instant;
+import java.util.Objects;
 import javax.annotation.Nonnull;
 
 public final class GroupChat implements Aggregate<GroupChat, GroupChatId> {
@@ -15,8 +17,10 @@ public final class GroupChat implements Aggregate<GroupChat, GroupChatId> {
   private final boolean deleted;
   private final GroupChatName name;
 
+  @JsonProperty("members")
   private final Members members;
 
+  @JsonProperty("messages")
   private final Messages messages;
 
   private final long sequenceNumber;
@@ -48,6 +52,14 @@ public final class GroupChat implements Aggregate<GroupChat, GroupChatId> {
 
   public boolean isDeleted() {
     return deleted;
+  }
+
+  public Members getMembers() {
+    return members;
+  }
+
+  public Messages getMessages() {
+    return messages;
   }
 
   @Override
@@ -222,6 +234,73 @@ public final class GroupChat implements Aggregate<GroupChat, GroupChatId> {
             newSequenceNumber,
             Instant.now());
     return Either.right(new Tuple2<>(newGroupChat, event));
+  }
+
+  @Override
+  public boolean equals(Object o) {
+    if (this == o) return true;
+    if (o == null || getClass() != o.getClass()) return false;
+    GroupChat groupChat = (GroupChat) o;
+    return deleted == groupChat.deleted
+        && sequenceNumber == groupChat.sequenceNumber
+        && version == groupChat.version
+        && Objects.equals(id, groupChat.id)
+        && Objects.equals(name, groupChat.name)
+        && Objects.equals(members, groupChat.members)
+        && Objects.equals(messages, groupChat.messages);
+  }
+
+  @Override
+  public int hashCode() {
+    return Objects.hash(id, deleted, name, members, messages, sequenceNumber, version);
+  }
+
+  @Override
+  public String toString() {
+    return "GroupChat{"
+        + "id="
+        + id
+        + ", deleted="
+        + deleted
+        + ", name="
+        + name
+        + ", members="
+        + members
+        + ", messages="
+        + messages
+        + ", sequenceNumber="
+        + sequenceNumber
+        + ", version="
+        + version
+        + '}';
+  }
+
+  public GroupChat applyEvent(@Nonnull GroupChatEvent event) {
+    if (event instanceof GroupChatEvent.Deleted) {
+      var e = (GroupChatEvent.Deleted) event;
+      return delete(e.executorId()).get()._1();
+    } else if (event instanceof GroupChatEvent.Renamed) {
+      var e = (GroupChatEvent.Renamed) event;
+      return rename(e.name(), e.executorId()).get()._1();
+    } else if (event instanceof GroupChatEvent.MemberAdded) {
+      var e = (GroupChatEvent.MemberAdded) event;
+      return addMember(e.member(), e.executorId()).get()._1();
+    } else if (event instanceof GroupChatEvent.MemberRemoved) {
+      var e = (GroupChatEvent.MemberRemoved) event;
+      return removeMemberByUserAccountId(e.member().getUserAccountId(), e.executorId()).get()._1();
+    } else if (event instanceof GroupChatEvent.MessagePosted) {
+      var e = (GroupChatEvent.MessagePosted) event;
+      return postMessage(e.message(), e.executorId()).get()._1();
+    } else if (event instanceof GroupChatEvent.MessageDeleted) {
+      var e = (GroupChatEvent.MessageDeleted) event;
+      return deleteMessageByMessageId(e.message().getId(), e.executorId()).get()._1();
+    } else {
+      throw new IllegalArgumentException();
+    }
+  }
+
+  public static GroupChat replay(Vector<GroupChatEvent> events, GroupChat snapshot) {
+    return events.foldLeft(snapshot, GroupChat::applyEvent);
   }
 
   public static Tuple2<GroupChat, GroupChatEvent> create(
