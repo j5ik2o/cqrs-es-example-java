@@ -138,6 +138,7 @@ project(":command:processor") {
         implementation(project(":infrastructure"))
         implementation(project(":command:domain"))
         implementation(project(":command:interface-adaptor-if"))
+        implementation("com.github.j5ik2o:event-store-adapter-java:1.1.106")
     }
 }
 
