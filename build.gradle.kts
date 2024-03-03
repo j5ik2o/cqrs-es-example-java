@@ -121,7 +121,7 @@ project(":command:interface-adaptor-impl") {
         implementation("mysql:mysql-connector-java:8.0.33")
 
         implementation("org.mybatis.spring.boot:mybatis-spring-boot-starter:2.2.2")
-        testImplementation("org.mybatis.spring.boot:mybatis-spring-boot-starter-test:2.2.2")
+        testImplementation("org.mybatis.spring.boot:mybatis-spring-boot-starter-test:2.3.2")
 
         testImplementation("org.flywaydb:flyway-core:10.8.1")
         testImplementation("org.flywaydb:flyway-mysql:10.8.1")
