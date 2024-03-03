@@ -126,8 +126,8 @@ project(":command:interface-adaptor-impl") {
         testImplementation("org.flywaydb:flyway-core:8.5.13")
         testImplementation("org.flywaydb:flyway-mysql:8.5.13")
 
-        testImplementation("org.testcontainers:localstack:1.19.2")
-        testImplementation("org.testcontainers:mysql:1.17.3")
+        testImplementation("org.testcontainers:localstack:1.19.6")
+        testImplementation("org.testcontainers:mysql:1.19.6")
 
         testImplementation("software.amazon.awssdk:dynamodb:2.25.1")
     }
