@@ -133,7 +133,7 @@ project(":command:interface-adaptor-impl") {
     }
 }
 
-project(":command:use-case") {
+project(":command:processor") {
     dependencies {
         implementation(project(":infrastructure"))
         implementation(project(":command:domain"))
@@ -152,7 +152,7 @@ project(":bootstrap") {
         implementation("org.springframework.boot:spring-boot-autoconfigure")
         implementation(project(":command:domain"))
         implementation(project(":command:interface-adaptor-impl"))
-        implementation(project(":command:use-case"))
+        implementation(project(":command:processor"))
         implementation(project(":query:interface-adaptor"))
         implementation(project(":rmu"))
     }
