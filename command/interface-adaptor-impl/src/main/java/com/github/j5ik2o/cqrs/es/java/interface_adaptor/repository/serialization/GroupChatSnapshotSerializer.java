@@ -1,9 +1,13 @@
-package com.github.j5ik2o.cqrs.es.java.domain.groupchat;
+package com.github.j5ik2o.cqrs.es.java.interface_adaptor.repository.serialization;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.module.SimpleModule;
 import com.github.f4b6a3.ulid.Ulid;
+import com.github.j5ik2o.cqrs.es.java.domain.groupchat.GroupChat;
+import com.github.j5ik2o.cqrs.es.java.domain.groupchat.GroupChatId;
+import com.github.j5ik2o.cqrs.es.java.domain.groupchat.Members;
+import com.github.j5ik2o.cqrs.es.java.domain.groupchat.Messages;
 import com.github.j5ik2o.event.store.adapter.java.DeserializationException;
 import com.github.j5ik2o.event.store.adapter.java.SerializationException;
 import com.github.j5ik2o.event.store.adapter.java.SnapshotSerializer;

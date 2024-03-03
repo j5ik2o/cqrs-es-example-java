@@ -1,4 +1,4 @@
-package com.github.j5ik2o.cqrs.es.java.domain.groupchat;
+package com.github.j5ik2o.cqrs.es.java.interface_adaptor.repository;
 
 import java.util.concurrent.CompletableFuture;
 import org.testcontainers.containers.localstack.LocalStackContainer;

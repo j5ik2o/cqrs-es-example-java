@@ -1,9 +1,15 @@
-package com.github.j5ik2o.cqrs.es.java.domain.groupchat;
+package com.github.j5ik2o.cqrs.es.java.interface_adaptor.repository;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.testcontainers.containers.localstack.LocalStackContainer.Service.DYNAMODB;
 
+import com.github.j5ik2o.cqrs.es.java.domain.groupchat.GroupChat;
+import com.github.j5ik2o.cqrs.es.java.domain.groupchat.GroupChatEvent;
+import com.github.j5ik2o.cqrs.es.java.domain.groupchat.GroupChatId;
+import com.github.j5ik2o.cqrs.es.java.domain.groupchat.GroupChatName;
 import com.github.j5ik2o.cqrs.es.java.domain.useraccount.UserAccountId;
+import com.github.j5ik2o.cqrs.es.java.interface_adaptor.repository.serialization.GroupChatEventSerializer;
+import com.github.j5ik2o.cqrs.es.java.interface_adaptor.repository.serialization.GroupChatSnapshotSerializer;
 import com.github.j5ik2o.event.store.adapter.java.EventStoreAsync;
 import org.junit.jupiter.api.Test;
 import org.slf4j.Logger;

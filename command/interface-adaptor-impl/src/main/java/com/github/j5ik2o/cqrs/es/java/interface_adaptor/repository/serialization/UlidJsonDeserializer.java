@@ -1,4 +1,4 @@
-package com.github.j5ik2o.cqrs.es.java.domain.groupchat;
+package com.github.j5ik2o.cqrs.es.java.interface_adaptor.repository.serialization;
 
 import com.fasterxml.jackson.core.JacksonException;
 import com.fasterxml.jackson.core.JsonParser;

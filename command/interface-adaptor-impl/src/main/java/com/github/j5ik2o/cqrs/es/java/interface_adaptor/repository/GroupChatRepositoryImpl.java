@@ -1,5 +1,6 @@
-package com.github.j5ik2o.cqrs.es.java.domain.groupchat;
+package com.github.j5ik2o.cqrs.es.java.interface_adaptor.repository;
 
+import com.github.j5ik2o.cqrs.es.java.domain.groupchat.*;
 import com.github.j5ik2o.event.store.adapter.java.EventStoreAsync;
 import io.vavr.collection.Vector;
 import io.vavr.control.Option;
