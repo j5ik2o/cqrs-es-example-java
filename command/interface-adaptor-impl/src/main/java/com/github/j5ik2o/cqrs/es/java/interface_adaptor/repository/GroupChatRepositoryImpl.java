@@ -6,8 +6,10 @@ import io.vavr.collection.Vector;
 import io.vavr.control.Option;
 import java.util.concurrent.CompletableFuture;
 import java.util.function.BiPredicate;
+import org.springframework.stereotype.Repository;
 
-public class GroupChatRepositoryImpl implements GroupChatRepository {
+@Repository
+public final class GroupChatRepositoryImpl implements GroupChatRepository {
   private final EventStoreAsync<GroupChatId, GroupChat, GroupChatEvent> eventStore;
   private final Option<BiPredicate<GroupChatEvent, GroupChat>> snapshotPredicateOpt;
 
@@ -79,5 +81,11 @@ public class GroupChatRepositoryImpl implements GroupChatRepository {
   public static GroupChatRepositoryImpl of(
       EventStoreAsync<GroupChatId, GroupChat, GroupChatEvent> eventStore) {
     return new GroupChatRepositoryImpl(eventStore, Option.none());
+  }
+
+  public static GroupChatRepositoryImpl of(
+      EventStoreAsync<GroupChatId, GroupChat, GroupChatEvent> eventStore,
+      Option<BiPredicate<GroupChatEvent, GroupChat>> snapshotPredicateOpt) {
+    return new GroupChatRepositoryImpl(eventStore, snapshotPredicateOpt);
   }
 }

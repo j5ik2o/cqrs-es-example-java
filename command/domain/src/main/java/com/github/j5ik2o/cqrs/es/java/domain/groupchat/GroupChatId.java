@@ -4,6 +4,7 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 import com.github.f4b6a3.ulid.Ulid;
 import com.github.f4b6a3.ulid.UlidCreator;
 import com.github.j5ik2o.event.store.adapter.java.AggregateId;
+import io.vavr.control.Either;
 import java.util.Objects;
 import javax.annotation.Nonnull;
 
@@ -65,6 +66,9 @@ public final class GroupChatId implements AggregateId {
   }
 
   public static GroupChatId ofString(String value) {
+    if (value == null || value.isEmpty()) {
+      throw new IllegalArgumentException("groupChatId is empty");
+    }
     if (value.startsWith(TYPE_NAME + "-")) {
       value = value.substring((TYPE_NAME + "-").length());
     }
@@ -73,5 +77,13 @@ public final class GroupChatId implements AggregateId {
 
   public static GroupChatId generate() {
     return GroupChatId.of(UlidCreator.getMonotonicUlid());
+  }
+
+  public static Either<IllegalArgumentException, GroupChatId> validate(String groupChatId) {
+    try {
+      return Either.right(GroupChatId.ofString(groupChatId));
+    } catch (IllegalArgumentException e) {
+      return Either.left(e);
+    }
   }
 }

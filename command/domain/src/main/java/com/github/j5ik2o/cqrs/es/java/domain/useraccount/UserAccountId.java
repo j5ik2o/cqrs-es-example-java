@@ -4,10 +4,11 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 import com.github.f4b6a3.ulid.Ulid;
 import com.github.f4b6a3.ulid.UlidCreator;
 import com.github.j5ik2o.event.store.adapter.java.AggregateId;
+import io.vavr.control.Either;
 import java.util.Objects;
 import javax.annotation.Nonnull;
 
-public class UserAccountId implements AggregateId {
+public final class UserAccountId implements AggregateId {
   private static final String TYPE_NAME = "UserAccount";
 
   @JsonProperty("value")
@@ -68,5 +69,13 @@ public class UserAccountId implements AggregateId {
 
   public static UserAccountId generate() {
     return UserAccountId.of(UlidCreator.getMonotonicUlid());
+  }
+
+  public static Either<IllegalArgumentException, UserAccountId> validate(String value) {
+    try {
+      return Either.right(UserAccountId.ofString(value));
+    } catch (Exception e) {
+      return Either.left(new IllegalArgumentException(e));
+    }
   }
 }

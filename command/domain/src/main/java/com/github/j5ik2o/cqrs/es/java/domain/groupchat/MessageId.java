@@ -2,6 +2,8 @@ package com.github.j5ik2o.cqrs.es.java.domain.groupchat;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.github.f4b6a3.ulid.Ulid;
+import com.github.f4b6a3.ulid.UlidCreator;
+import io.vavr.control.Either;
 import java.util.Objects;
 import javax.annotation.Nonnull;
 
@@ -45,6 +47,21 @@ public final class MessageId {
   }
 
   public static MessageId of(String value) {
+    if (value == null || value.isEmpty()) {
+      throw new IllegalArgumentException("value is empty");
+    }
     return new MessageId(Ulid.from(value));
+  }
+
+  public static MessageId generate() {
+    return new MessageId(UlidCreator.getMonotonicUlid());
+  }
+
+  public static Either<IllegalArgumentException, MessageId> validate(String value) {
+    try {
+      return Either.right(of(value));
+    } catch (IllegalArgumentException e) {
+      return Either.left(e);
+    }
   }
 }
