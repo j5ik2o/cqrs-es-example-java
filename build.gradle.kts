@@ -150,7 +150,13 @@ project(":command:interface-adaptor-impl") {
         outputDir = File("$projectDir/build/generated")
         packageName = "com.github.j5ik2o.cqrs.es.java.interface_adaptor.graphql"
         customTypesMapping = mutableMapOf(Pair("EpochMillis", "java.time.LocalDateTime"))
-        customAnnotationsMapping = mutableMapOf(Pair("EpochMillis", listOf("@com.fasterxml.jackson.databind.annotation.JsonDeserialize(using = com.example.json.EpochMillisScalarDeserializer.class)")))
+        customAnnotationsMapping =
+            mutableMapOf(
+                Pair(
+                    "EpochMillis",
+                    listOf("@com.fasterxml.jackson.databind.annotation.JsonDeserialize(using = com.example.json.EpochMillisScalarDeserializer.class)"),
+                ),
+            )
         parentInterfaces {
             queryResolver = "graphql.kickstart.tools.GraphQLQueryResolver"
             mutationResolver = "graphql.kickstart.tools.GraphQLMutationResolver"

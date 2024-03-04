@@ -4,8 +4,8 @@ import org.springframework.stereotype.Component;
 
 @Component
 public class QueryResolverImpl implements QueryResolver {
-    @Override
-    public String healthCheck() throws Exception {
-        return "OK";
-    }
+  @Override
+  public String healthCheck() throws Exception {
+    return "OK";
+  }
 }

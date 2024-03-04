@@ -7,7 +7,12 @@ import org.springframework.boot.autoconfigure.jdbc.DataSourceTransactionManagerA
 import org.springframework.boot.autoconfigure.orm.jpa.HibernateJpaAutoConfiguration;
 import org.springframework.context.annotation.ComponentScan;
 
-@SpringBootApplication(exclude = {DataSourceAutoConfiguration.class, DataSourceTransactionManagerAutoConfiguration.class, HibernateJpaAutoConfiguration.class})
+@SpringBootApplication(
+    exclude = {
+      DataSourceAutoConfiguration.class,
+      DataSourceTransactionManagerAutoConfiguration.class,
+      HibernateJpaAutoConfiguration.class
+    })
 @ComponentScan(basePackages = {"com.github.j5ik2o.cqrs.es.java"})
 public class Main {
   public static void main(String[] args) {
