@@ -154,7 +154,10 @@ project(":command:interface-adaptor-impl") {
             mutableMapOf(
                 Pair(
                     "EpochMillis",
-                    listOf("@com.fasterxml.jackson.databind.annotation.JsonDeserialize(using = com.example.json.EpochMillisScalarDeserializer.class)"),
+                    listOf(
+                        "@com.fasterxml.jackson.databind.annotation.JsonDeserialize" +
+                            "(using = com.example.json.EpochMillisScalarDeserializer.class)",
+                    ),
                 ),
             )
         parentInterfaces {
