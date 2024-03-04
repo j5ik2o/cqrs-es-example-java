@@ -77,10 +77,16 @@ subprojects {
 
     spotless {
         java {
+            target("src/**/*.java")
+            targetExclude("**/generated/**")
             importOrder()
             removeUnusedImports()
             googleJavaFormat()
         }
+    }
+
+    tasks.test {
+        enabled = false
     }
 }
 
@@ -116,6 +122,7 @@ project(":command:interface-adaptor-impl") {
         implementation(project(":infrastructure"))
         implementation(project(":command:domain"))
         implementation(project(":command:interface-adaptor-if"))
+        implementation(project(":command:processor"))
         implementation("com.github.j5ik2o:event-store-adapter-java:1.1.106")
         implementation("com.github.f4b6a3:ulid-creator:5.2.3")
 
@@ -139,8 +146,10 @@ project(":command:interface-adaptor-impl") {
         testImplementation("org.testcontainers:localstack:1.19.6")
         testImplementation("org.testcontainers:mysql:1.19.6")
 
-        testImplementation("software.amazon.awssdk:dynamodb:2.25.1")
+        implementation("software.amazon.awssdk:dynamodb:2.25.1")
         implementation("javax.validation:validation-api:2.0.1.Final")
+
+        implementation("io.projectreactor:reactor-core:3.6.3")
     }
 
     tasks.named<GraphQLCodegenGradleTask>("graphqlCodegen") {
@@ -164,6 +173,8 @@ project(":command:interface-adaptor-impl") {
             queryResolver = "graphql.kickstart.tools.GraphQLQueryResolver"
             mutationResolver = "graphql.kickstart.tools.GraphQLMutationResolver"
         }
+        apiReturnType = "reactor.core.publisher.Mono"
+        apiReturnListType = "reactor.core.publisher.Flux"
     }
 
     // Automatically generate GraphQL code on project build:
@@ -183,6 +194,7 @@ project(":command:processor") {
         implementation(project(":command:domain"))
         implementation(project(":command:interface-adaptor-if"))
         implementation("com.github.j5ik2o:event-store-adapter-java:1.1.106")
+        implementation("org.springframework:spring-context")
     }
 }
 

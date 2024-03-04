@@ -2,6 +2,7 @@ package com.github.j5ik2o.cqrs.es.java.domain.groupchat;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.github.j5ik2o.cqrs.es.java.domain.useraccount.UserAccountId;
+import io.vavr.control.Either;
 import java.time.LocalDateTime;
 import java.util.Objects;
 import javax.annotation.Nonnull;
@@ -78,6 +79,21 @@ public final class Message {
 
   public static Message of(
       MessageId id, String content, UserAccountId senderId, LocalDateTime createdAt) {
+    if (content == null || content.isEmpty()) {
+      throw new IllegalArgumentException("content is empty");
+    }
+    if (content.length() > 1000) {
+      throw new IllegalArgumentException("content is too long");
+    }
     return new Message(id, content, senderId, createdAt);
+  }
+
+  public static Either<IllegalArgumentException, Message> validate(
+      MessageId id, String content, UserAccountId senderId, LocalDateTime createdAt) {
+    try {
+      return Either.right(of(id, content, senderId, createdAt));
+    } catch (IllegalArgumentException e) {
+      return Either.left(e);
+    }
   }
 }

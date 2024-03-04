@@ -5,11 +5,15 @@ import com.github.j5ik2o.cqrs.es.java.domain.useraccount.UserAccountId;
 import com.github.j5ik2o.cqrs.es.java.interface_adaptor.repository.GroupChatRepository;
 import io.vavr.Tuple2;
 import java.util.concurrent.CompletableFuture;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Component;
 
-public class GroupChatCommandProcessor {
+@Component
+public final class GroupChatCommandProcessor {
 
   private final GroupChatRepository groupChatRepository;
 
+  @Autowired
   public GroupChatCommandProcessor(GroupChatRepository groupChatRepository) {
     this.groupChatRepository = groupChatRepository;
   }
@@ -63,7 +67,7 @@ public class GroupChatCommandProcessor {
             });
   }
 
-  public CompletableFuture<Tuple2<GroupChatId, UserAccountId>> addMember(
+  public CompletableFuture<GroupChatId> addMember(
       GroupChatId id, Member member, UserAccountId executorId) {
     return groupChatRepository
         .findById(id)
@@ -79,11 +83,7 @@ public class GroupChatCommandProcessor {
                     groupChatMemberAdded ->
                         groupChatRepository
                             .store(groupChatMemberAdded._2, groupChatMemberAdded._1)
-                            .thenApply(
-                                ignore ->
-                                    new Tuple2<>(
-                                        groupChatMemberAdded._1.getId(),
-                                        member.getUserAccountId())));
+                            .thenApply(ignore -> groupChatMemberAdded._1.getId()));
               }
             });
   }
@@ -109,7 +109,7 @@ public class GroupChatCommandProcessor {
             });
   }
 
-  public CompletableFuture<GroupChatId> postMessage(
+  public CompletableFuture<Tuple2<GroupChatId, MessageId>> postMessage(
       GroupChatId id, Message message, UserAccountId executorId) {
     return groupChatRepository
         .findById(id)
@@ -125,7 +125,10 @@ public class GroupChatCommandProcessor {
                     groupChatMessagePosted ->
                         groupChatRepository
                             .store(groupChatMessagePosted._2, groupChatMessagePosted._1)
-                            .thenApply(ignore -> groupChatMessagePosted._1.getId()));
+                            .thenApply(
+                                ignore ->
+                                    new Tuple2<>(
+                                        groupChatMessagePosted._1.getId(), message.getId())));
               }
             });
   }

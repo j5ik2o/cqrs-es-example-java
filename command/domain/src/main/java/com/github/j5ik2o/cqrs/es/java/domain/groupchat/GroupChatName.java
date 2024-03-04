@@ -1,6 +1,7 @@
 package com.github.j5ik2o.cqrs.es.java.domain.groupchat;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
+import io.vavr.control.Either;
 import java.util.Objects;
 import javax.annotation.Nonnull;
 
@@ -35,6 +36,20 @@ public final class GroupChatName {
   }
 
   public static GroupChatName of(String value) {
+    if (value == null || value.isEmpty()) {
+      throw new IllegalArgumentException("name is empty");
+    }
+    if (value.length() > 255) {
+      throw new IllegalArgumentException("name is too long");
+    }
     return new GroupChatName(value);
+  }
+
+  public static Either<IllegalArgumentException, GroupChatName> validate(String name) {
+    try {
+      return Either.right(of(name));
+    } catch (IllegalArgumentException e) {
+      return Either.left(e);
+    }
   }
 }
