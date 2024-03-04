@@ -2,6 +2,7 @@ package com.github.j5ik2o.cqrs.es.java.processor;
 
 import com.github.j5ik2o.cqrs.es.java.domain.groupchat.*;
 import com.github.j5ik2o.cqrs.es.java.domain.useraccount.UserAccountId;
+import com.github.j5ik2o.cqrs.es.java.interface_adaptor.repository.GroupChatRepository;
 import io.vavr.Tuple2;
 import java.util.concurrent.CompletableFuture;
 

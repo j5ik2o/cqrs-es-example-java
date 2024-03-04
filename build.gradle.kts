@@ -1,3 +1,4 @@
+import io.github.kobylynskyi.graphql.codegen.gradle.GraphQLCodegenGradleTask
 import org.springframework.boot.gradle.tasks.bundling.BootJar
 
 plugins {
@@ -5,6 +6,7 @@ plugins {
     id("org.springframework.boot") version "3.2.3"
     id("io.spring.dependency-management") version "1.1.4"
     id("com.diffplug.spotless") version "6.25.0"
+    id("io.github.kobylynskyi.graphql.codegen") version "5.10.0"
 }
 
 tasks.getByName<BootJar>("bootJar") {
@@ -109,6 +111,7 @@ project(":command:interface-adaptor-if") {
 }
 
 project(":command:interface-adaptor-impl") {
+    apply(plugin = "io.github.kobylynskyi.graphql.codegen")
     dependencies {
         implementation(project(":infrastructure"))
         implementation(project(":command:domain"))
@@ -116,7 +119,14 @@ project(":command:interface-adaptor-impl") {
         implementation("com.github.j5ik2o:event-store-adapter-java:1.1.106")
         implementation("com.github.f4b6a3:ulid-creator:5.2.3")
 
-        implementation("org.springframework.boot:spring-boot-starter-graphql")
+        implementation("org.springframework.boot:spring-boot-starter")
+        testImplementation("org.springframework.boot:spring-boot-starter-test")
+
+        implementation("com.graphql-java:graphql-java:21.3")
+        implementation("com.graphql-java-kickstart:graphql-java-tools:13.0.3")
+        implementation("com.graphql-java-kickstart:graphql-spring-boot-starter:15.1.0")
+        testImplementation("com.graphql-java-kickstart:graphql-spring-boot-starter-test:15.1.0")
+
         testImplementation("org.springframework:spring-webflux")
         implementation("mysql:mysql-connector-java:8.0.33")
 
@@ -130,6 +140,31 @@ project(":command:interface-adaptor-impl") {
         testImplementation("org.testcontainers:mysql:1.19.6")
 
         testImplementation("software.amazon.awssdk:dynamodb:2.25.1")
+        implementation("javax.validation:validation-api:2.0.1.Final")
+    }
+
+    tasks.named<GraphQLCodegenGradleTask>("graphqlCodegen") {
+        // all config options:
+        // https://github.com/kobylynskyi/graphql-java-codegen/blob/main/docs/codegen-options.md
+        graphqlSchemaPaths = listOf("$projectDir/src/main/resources/graphql/schema.graphqls")
+        outputDir = File("$projectDir/build/generated")
+        packageName = "com.github.j5ik2o.cqrs.es.java.interface_adaptor.graphql"
+        customTypesMapping = mutableMapOf(Pair("EpochMillis", "java.time.LocalDateTime"))
+        customAnnotationsMapping = mutableMapOf(Pair("EpochMillis", listOf("@com.fasterxml.jackson.databind.annotation.JsonDeserialize(using = com.example.json.EpochMillisScalarDeserializer.class)")))
+        parentInterfaces {
+            queryResolver = "graphql.kickstart.tools.GraphQLQueryResolver"
+            mutationResolver = "graphql.kickstart.tools.GraphQLMutationResolver"
+        }
+    }
+
+    // Automatically generate GraphQL code on project build:
+    sourceSets {
+        getByName("main").java.srcDirs("$projectDir/build/generated")
+    }
+
+// Add generated sources to your project source sets:
+    tasks.named<JavaCompile>("compileJava") {
+        dependsOn("graphqlCodegen")
     }
 }
 
@@ -151,6 +186,9 @@ project(":bootstrap") {
 
     dependencies {
         implementation("org.springframework.boot:spring-boot-autoconfigure")
+        implementation("org.springframework.boot:spring-boot-starter-webflux")
+        implementation("org.springframework.boot:spring-boot-starter")
+        implementation("com.graphql-java-kickstart:graphql-spring-boot-starter:15.1.0")
         implementation(project(":command:domain"))
         implementation(project(":command:interface-adaptor-impl"))
         implementation(project(":command:processor"))

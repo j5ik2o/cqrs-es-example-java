@@ -1,0 +1,25 @@
+server:
+  port: 48080
+graphql:
+  graphiql:
+    mapping: /graphiql
+    endpoint:
+      graphql: /graphql
+      subscriptions: /subscriptions
+    subscriptions:
+      timeout: 30
+      reconnect: false
+    basePath: /
+    enabled: true
+    pageTitle: GraphiQL
+    cdn:
+      enabled: false
+      version: latest
+    props:
+      resources:
+        defaultQuery: "graphql/schema.graphqls"
+    headers:
+      Authorization: "Bearer 123"
+logging:
+  level:
+    root: debug
