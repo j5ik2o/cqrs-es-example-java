@@ -123,7 +123,7 @@ project(":command:interface-adaptor-impl") {
         testImplementation("org.springframework.boot:spring-boot-starter-test")
 
         implementation("com.graphql-java:graphql-java:21.3")
-        implementation("com.graphql-java-kickstart:graphql-java-tools:13.0.3")
+        implementation("com.graphql-java-kickstart:graphql-java-tools:13.1.1")
         implementation("com.graphql-java-kickstart:graphql-spring-boot-starter:15.1.0")
         testImplementation("com.graphql-java-kickstart:graphql-spring-boot-starter-test:15.1.0")
 
