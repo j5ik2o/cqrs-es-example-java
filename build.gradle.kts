@@ -98,7 +98,7 @@ project(":infrastructure") {
 
 project(":command:domain") {
     dependencies {
-        implementation("com.github.j5ik2o:event-store-adapter-java:1.1.106")
+        implementation("com.github.j5ik2o:event-store-adapter-java:1.1.107")
         implementation(project(":infrastructure"))
         implementation("com.github.f4b6a3:ulid-creator:5.2.3")
         implementation("com.fasterxml.jackson.core:jackson-databind:2.16.1")
@@ -123,22 +123,22 @@ project(":command:interface-adaptor-impl") {
         implementation(project(":command:domain"))
         implementation(project(":command:interface-adaptor-if"))
         implementation(project(":command:processor"))
-        implementation("com.github.j5ik2o:event-store-adapter-java:1.1.106")
+        implementation("com.github.j5ik2o:event-store-adapter-java:1.1.107")
         implementation("com.github.f4b6a3:ulid-creator:5.2.3")
 
         implementation("org.springframework.boot:spring-boot-starter")
         testImplementation("org.springframework.boot:spring-boot-starter-test")
 
         implementation("com.graphql-java:graphql-java:21.3")
-        implementation("com.graphql-java-kickstart:graphql-java-tools:13.0.3")
+        implementation("com.graphql-java-kickstart:graphql-java-tools:13.1.1")
         implementation("com.graphql-java-kickstart:graphql-spring-boot-starter:15.1.0")
         testImplementation("com.graphql-java-kickstart:graphql-spring-boot-starter-test:15.1.0")
 
         testImplementation("org.springframework:spring-webflux")
         implementation("mysql:mysql-connector-java:8.0.33")
 
-        implementation("org.mybatis.spring.boot:mybatis-spring-boot-starter:2.2.2")
-        testImplementation("org.mybatis.spring.boot:mybatis-spring-boot-starter-test:2.2.2")
+        implementation("org.mybatis.spring.boot:mybatis-spring-boot-starter:2.3.2")
+        testImplementation("org.mybatis.spring.boot:mybatis-spring-boot-starter-test:3.0.3")
 
         testImplementation("org.flywaydb:flyway-core:10.8.1")
         testImplementation("org.flywaydb:flyway-mysql:10.8.1")
@@ -193,8 +193,8 @@ project(":command:processor") {
         implementation(project(":infrastructure"))
         implementation(project(":command:domain"))
         implementation(project(":command:interface-adaptor-if"))
-        implementation("com.github.j5ik2o:event-store-adapter-java:1.1.106")
         implementation("org.springframework:spring-context")
+        implementation("com.github.j5ik2o:event-store-adapter-java:1.1.107")
     }
 }
 
