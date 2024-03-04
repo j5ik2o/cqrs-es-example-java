@@ -146,7 +146,7 @@ project(":command:interface-adaptor-impl") {
         testImplementation("org.testcontainers:localstack:1.19.6")
         testImplementation("org.testcontainers:mysql:1.19.6")
 
-        implementation("software.amazon.awssdk:dynamodb:2.25.1")
+        implementation("software.amazon.awssdk:dynamodb:2.25.2")
         implementation("javax.validation:validation-api:2.0.1.Final")
 
         implementation("io.projectreactor:reactor-core:3.6.3")
