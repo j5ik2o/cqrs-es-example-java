@@ -1,0 +1,6 @@
+spring:
+  config:
+    import: classpath:application-common.yml
+  graphql:
+    schema:
+      locations: classpath*:graphql-read/**/

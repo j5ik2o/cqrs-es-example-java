@@ -30,11 +30,11 @@ public class Main {
     SpringApplication app = new SpringApplication(Main.class);
     ConfigurableEnvironment environment = new StandardEnvironment();
     if (cmd.hasOption("w")) {
-      environment.addActiveProfile("WriteAPI");
+      environment.addActiveProfile("write");
     } else if (cmd.hasOption("r")) {
-      environment.addActiveProfile("ReadAPI");
+      environment.addActiveProfile("read");
     } else if (cmd.hasOption("l")) {
-      environment.addActiveProfile("LocalRMU");
+      environment.addActiveProfile("local-rmu");
     } else {
       throw new IllegalArgumentException("profile is not specified");
     }
