@@ -103,7 +103,7 @@ ISO 8601 combined date and time without timezone.
 """
 scalar NaiveDateTime
 
-type QueryRoot {
+type Query {
 	"""
 	指定されたグループチャットIDのグループチャットを取得する。
 
@@ -171,16 +171,7 @@ type QueryRoot {
 	getMessages(groupChatId: String!, userAccountId: String!): [Message!]!
 }
 
-
-"""
-https://github.com/async-graphql/examples/blob/c8219078a4b7aa6d84d22e9b79f033088897be4b/poem/subscription-redis/src/main.rs
-"""
-type SubscriptionRoot {
-	groupChats(groupChatId: String!): String!
-}
-
 schema {
-	query: QueryRoot
-	subscription: SubscriptionRoot
+	query: Query
 }
 
