@@ -98,7 +98,7 @@ project(":infrastructure") {
 
 project(":command:domain") {
     dependencies {
-        implementation("com.github.j5ik2o:event-store-adapter-java:1.1.107")
+        implementation("com.github.j5ik2o:event-store-adapter-java:1.1.108")
         implementation(project(":infrastructure"))
         implementation("com.github.f4b6a3:ulid-creator:5.2.3")
         implementation("com.fasterxml.jackson.core:jackson-databind:2.16.1")
@@ -123,7 +123,7 @@ project(":command:interface-adaptor-impl") {
         implementation(project(":command:domain"))
         implementation(project(":command:interface-adaptor-if"))
         implementation(project(":command:processor"))
-        implementation("com.github.j5ik2o:event-store-adapter-java:1.1.107")
+        implementation("com.github.j5ik2o:event-store-adapter-java:1.1.108")
         implementation("com.github.f4b6a3:ulid-creator:5.2.3")
 
         implementation("org.springframework.boot:spring-boot-starter")
@@ -194,7 +194,7 @@ project(":command:processor") {
         implementation(project(":command:domain"))
         implementation(project(":command:interface-adaptor-if"))
         implementation("org.springframework:spring-context")
-        implementation("com.github.j5ik2o:event-store-adapter-java:1.1.107")
+        implementation("com.github.j5ik2o:event-store-adapter-java:1.1.108")
     }
 }
 
