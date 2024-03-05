@@ -135,12 +135,6 @@ project(":command:interface-adaptor-impl") {
         testImplementation("org.springframework:spring-webflux")
         implementation("mysql:mysql-connector-java:8.0.33")
 
-        implementation("org.mybatis.spring.boot:mybatis-spring-boot-starter:2.3.2")
-        testImplementation("org.mybatis.spring.boot:mybatis-spring-boot-starter-test:3.0.3")
-
-        testImplementation("org.flywaydb:flyway-core:10.8.1")
-        testImplementation("org.flywaydb:flyway-mysql:10.8.1")
-
         testImplementation("org.testcontainers:localstack:1.19.6")
         testImplementation("org.testcontainers:mysql:1.19.6")
 
@@ -199,6 +193,10 @@ project(":query:interface-adaptor") {
         implementation("org.springframework:spring-context")
         implementation("org.springframework.boot:spring-boot-starter-graphql")
         implementation("com.graphql-java:graphql-java:21.3")
+        implementation("org.mybatis.spring.boot:mybatis-spring-boot-starter:2.3.2")
+        testImplementation("org.mybatis.spring.boot:mybatis-spring-boot-starter-test:3.0.3")
+        testImplementation("org.flywaydb:flyway-core:10.8.1")
+        testImplementation("org.flywaydb:flyway-mysql:10.8.1")
     }
 
     tasks.named<GraphQLCodegenGradleTask>("graphqlCodegen") {
@@ -228,6 +226,16 @@ project(":query:interface-adaptor") {
 
     tasks.named<JavaCompile>("compileJava") {
         dependsOn("graphqlCodegen")
+    }
+}
+
+project(":rmu") {
+    dependencies {
+        implementation(project(":infrastructure"))
+        implementation("org.mybatis.spring.boot:mybatis-spring-boot-starter:2.3.2")
+        testImplementation("org.mybatis.spring.boot:mybatis-spring-boot-starter-test:3.0.3")
+        testImplementation("org.flywaydb:flyway-core:10.8.1")
+        testImplementation("org.flywaydb:flyway-mysql:10.8.1")
     }
 }
 
