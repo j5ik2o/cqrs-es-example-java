@@ -1,0 +1,9 @@
+server:
+  port: 48080
+spring:
+  graphql:
+    graphiql:
+      enabled: true
+logging:
+  level:
+    root: debug
