@@ -195,7 +195,7 @@ project(":query:interface-adaptor") {
         implementation("com.graphql-java:graphql-java:21.3")
         implementation("org.mybatis.spring.boot:mybatis-spring-boot-starter:2.3.2")
         testImplementation("org.mybatis.spring.boot:mybatis-spring-boot-starter-test:3.0.3")
-        testImplementation("org.flywaydb:flyway-core:10.8.1")
+        testImplementation("org.flywaydb:flyway-core:10.9.0")
         testImplementation("org.flywaydb:flyway-mysql:10.8.1")
     }
 
@@ -234,7 +234,7 @@ project(":rmu") {
         implementation(project(":infrastructure"))
         implementation("org.mybatis.spring.boot:mybatis-spring-boot-starter:2.3.2")
         testImplementation("org.mybatis.spring.boot:mybatis-spring-boot-starter-test:3.0.3")
-        testImplementation("org.flywaydb:flyway-core:10.8.1")
+        testImplementation("org.flywaydb:flyway-core:10.9.0")
         testImplementation("org.flywaydb:flyway-mysql:10.8.1")
     }
 }
