@@ -206,6 +206,7 @@ project(":bootstrap") {
     }
 
     dependencies {
+        implementation("commons-cli:commons-cli:1.6.0")
         implementation("org.springframework.boot:spring-boot-autoconfigure")
         implementation("org.springframework.boot:spring-boot-starter-webflux")
         implementation("org.springframework.boot:spring-boot-starter")

@@ -4,16 +4,12 @@ import com.github.j5ik2o.cqrs.es.java.domain.groupchat.*;
 import com.github.j5ik2o.cqrs.es.java.domain.useraccount.UserAccountId;
 import com.github.j5ik2o.cqrs.es.java.processor.GroupChatCommandProcessor;
 import java.time.LocalDateTime;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.stereotype.Component;
 import reactor.core.publisher.Mono;
 
-@Component
 public class MutationResolverImpl implements MutationResolver {
 
   private final GroupChatCommandProcessor groupChatCommandProcessor;
 
-  @Autowired
   public MutationResolverImpl(GroupChatCommandProcessor groupChatCommandProcessor) {
     this.groupChatCommandProcessor = groupChatCommandProcessor;
   }

@@ -6,10 +6,8 @@ import io.vavr.collection.Vector;
 import io.vavr.control.Option;
 import java.util.concurrent.CompletableFuture;
 import java.util.function.BiPredicate;
-import org.springframework.stereotype.Repository;
 
-@Repository
-public final class GroupChatRepositoryImpl implements GroupChatRepository {
+public class GroupChatRepositoryImpl implements GroupChatRepository {
   private final EventStoreAsync<GroupChatId, GroupChat, GroupChatEvent> eventStore;
   private final Option<BiPredicate<GroupChatEvent, GroupChat>> snapshotPredicateOpt;
 

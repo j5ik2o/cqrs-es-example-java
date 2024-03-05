@@ -9,7 +9,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
 @Component
-public final class GroupChatCommandProcessor {
+public class GroupChatCommandProcessor {
 
   private final GroupChatRepository groupChatRepository;
 
