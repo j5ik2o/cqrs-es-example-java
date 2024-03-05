@@ -135,8 +135,8 @@ project(":command:interface-adaptor-impl") {
         testImplementation("org.springframework:spring-webflux")
         implementation("mysql:mysql-connector-java:8.0.33")
 
-        testImplementation("org.testcontainers:localstack:1.19.6")
-        testImplementation("org.testcontainers:mysql:1.19.6")
+        testImplementation("org.testcontainers:localstack:1.19.7")
+        testImplementation("org.testcontainers:mysql:1.19.7")
 
         implementation("software.amazon.awssdk:dynamodb:2.25.2")
         implementation("javax.validation:validation-api:2.0.1.Final")
