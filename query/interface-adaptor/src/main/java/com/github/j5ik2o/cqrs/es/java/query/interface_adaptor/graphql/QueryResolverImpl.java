@@ -25,32 +25,98 @@ public class QueryResolverImpl implements QueryResolver {
   }
 
   @Override
-  public Mono<GroupChat> getGroupChat(String groupChatId, String userAccountId) throws Exception {
-    return null;
+  public Mono<GroupChatOutput> getGroupChat(String groupChatId, String userAccountId)
+      throws Exception {
+    return Mono.justOrEmpty(
+        groupChatMapper
+            .getGroupChat(groupChatId, userAccountId)
+            .map(
+                groupChatRecord ->
+                    new GroupChatOutput(
+                        groupChatRecord.id(),
+                        groupChatRecord.name(),
+                        groupChatRecord.ownerId(),
+                        groupChatRecord.createdAt().toString(),
+                        groupChatRecord.updatedAt().toString())));
   }
 
   @Override
-  public Flux<GroupChat> getGroupChats(String userAccountId) throws Exception {
-    return null;
+  public Flux<GroupChatOutput> getGroupChats(String userAccountId) throws Exception {
+    return Flux.fromArray(
+        groupChatMapper.getGroupChats(userAccountId).stream()
+            .map(
+                groupChatRecord ->
+                    new GroupChatOutput(
+                        groupChatRecord.id(),
+                        groupChatRecord.name(),
+                        groupChatRecord.ownerId(),
+                        groupChatRecord.createdAt().toString(),
+                        groupChatRecord.updatedAt().toString()))
+            .toArray(GroupChatOutput[]::new));
   }
 
   @Override
-  public Mono<Member> getMember(String groupChatId, String userAccountId) throws Exception {
-    return null;
+  public Mono<MemberOutput> getMember(String groupChatId, String userAccountId) throws Exception {
+    return Mono.justOrEmpty(
+        memberMapper
+            .getMember(groupChatId, userAccountId)
+            .map(
+                memberRecord ->
+                    new MemberOutput(
+                        memberRecord.id(),
+                        memberRecord.groupChatId(),
+                        memberRecord.userAccountId(),
+                        memberRecord.role(),
+                        memberRecord.createdAt().toString(),
+                        memberRecord.updatedAt().toString())));
   }
 
   @Override
-  public Flux<Member> getMembers(String groupChatId, String userAccountId) throws Exception {
-    return null;
+  public Flux<MemberOutput> getMembers(String groupChatId, String userAccountId) throws Exception {
+    return Flux.just(
+        memberMapper.getMembers(groupChatId, userAccountId).stream()
+            .map(
+                memberRecord ->
+                    new MemberOutput(
+                        memberRecord.id(),
+                        memberRecord.groupChatId(),
+                        memberRecord.userAccountId(),
+                        memberRecord.role(),
+                        memberRecord.createdAt().toString(),
+                        memberRecord.updatedAt().toString()))
+            .toArray(MemberOutput[]::new));
   }
 
   @Override
-  public Mono<Message> getMessage(String messageId, String userAccountId) throws Exception {
-    return null;
+  public Mono<MessageOutput> getMessage(String messageId, String userAccountId) throws Exception {
+    return Mono.justOrEmpty(
+        messageMapper
+            .getMessage(messageId, userAccountId)
+            .map(
+                messageRecord ->
+                    new MessageOutput(
+                        messageRecord.id(),
+                        messageRecord.groupChatId(),
+                        messageRecord.senderId(),
+                        messageRecord.content(),
+                        messageRecord.createdAt().toString(),
+                        messageRecord.updatedAt().toString())));
   }
 
   @Override
-  public Flux<Message> getMessages(String groupChatId, String userAccountId) throws Exception {
-    return null;
+  public Flux<MessageOutput> getMessages(String groupChatId, String userAccountId)
+      throws Exception {
+    return Flux.just(
+        messageMapper.getMessages(groupChatId, userAccountId).stream()
+            .map(
+                messageRecord ->
+                    new MessageOutput(
+                        messageRecord.id(),
+                        messageRecord.groupChatId(),
+                        messageRecord.senderId(),
+                        messageRecord.content(),
+                        messageRecord.createdAt().toString(),
+                        messageRecord.updatedAt().toString()))
+            .toArray(MessageOutput[]::new));
   }
 }

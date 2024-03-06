@@ -9,7 +9,7 @@
 NOTE: リードモデルはDTOとして利用されるものです。
 特段振る舞いのようなものはありません。
 """
-type GroupChat {
+type GroupChatOutput {
 	"""
 	グループチャットID
 	"""
@@ -37,7 +37,7 @@ type GroupChat {
 """
 メンバーリードモデル
 """
-type Member {
+type MemberOutput {
 	"""
 	メンバーID
 	"""
@@ -67,7 +67,7 @@ type Member {
 """
 メッセージリードモデル
 """
-type Message {
+type MessageOutput {
 	"""
 	メッセージID
 	"""
@@ -114,7 +114,7 @@ type Query {
 	# 戻り値
 	- `GroupChat` - グループチャット
 	"""
-	getGroupChat(groupChatId: String!, userAccountId: String!): GroupChat!
+	getGroupChat(groupChatId: String!, userAccountId: String!): GroupChatOutput!
 	"""
 	指定されたアカウントIDが参加するグループチャット一覧を取得する。
 
@@ -124,7 +124,7 @@ type Query {
 	# 戻り値
 	- `Vec<GroupChat>` - グループチャット一覧
 	"""
-	getGroupChats(userAccountId: String!): [GroupChat!]!
+	getGroupChats(userAccountId: String!): [GroupChatOutput!]!
 	"""
 	指定されたアカウントIDのメンバーを取得する
 
@@ -135,7 +135,7 @@ type Query {
 	# 戻り値
 	- `Member` - [Member]
 	"""
-	getMember(groupChatId: String!, userAccountId: String!): Member!
+	getMember(groupChatId: String!, userAccountId: String!): MemberOutput!
 	"""
 	指定されたグループチャットIDのメンバー一覧を取得する
 
@@ -146,7 +146,7 @@ type Query {
 	# 戻り値
 	- `Vec<Member>` - メンバー一覧
 	"""
-	getMembers(groupChatId: String!, userAccountId: String!): [Member!]!
+	getMembers(groupChatId: String!, userAccountId: String!): [MemberOutput!]!
 	"""
 	指定されたメッセージIDのメッセージを取得する
 
@@ -157,7 +157,7 @@ type Query {
 	# 戻り値
 	- `Message` - メッセージ
 	"""
-	getMessage(messageId: String!, userAccountId: String!): Message!
+	getMessage(messageId: String!, userAccountId: String!): MessageOutput!
 	"""
 	指定されたグループチャットIDのメッセージ一覧を取得する
 
@@ -168,7 +168,7 @@ type Query {
 	# 戻り値
 	- `Vec<Message>` - メッセージ一覧
 	"""
-	getMessages(groupChatId: String!, userAccountId: String!): [Message!]!
+	getMessages(groupChatId: String!, userAccountId: String!): [MessageOutput!]!
 }
 
 schema {
