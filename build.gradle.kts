@@ -98,7 +98,7 @@ project(":infrastructure") {
 
 project(":command:domain") {
     dependencies {
-        implementation("com.github.j5ik2o:event-store-adapter-java:1.1.108")
+        implementation("com.github.j5ik2o:event-store-adapter-java:1.1.109")
         implementation(project(":infrastructure"))
         implementation("com.github.f4b6a3:ulid-creator:5.2.3")
         implementation("com.fasterxml.jackson.core:jackson-databind:2.16.1")
@@ -123,7 +123,7 @@ project(":command:interface-adaptor-impl") {
         implementation(project(":command:domain"))
         implementation(project(":command:interface-adaptor-if"))
         implementation(project(":command:processor"))
-        implementation("com.github.j5ik2o:event-store-adapter-java:1.1.108")
+        implementation("com.github.j5ik2o:event-store-adapter-java:1.1.109")
         implementation("com.github.f4b6a3:ulid-creator:5.2.3")
 
         implementation("org.springframework.boot:spring-boot-starter")
@@ -138,7 +138,7 @@ project(":command:interface-adaptor-impl") {
         testImplementation("org.testcontainers:localstack:1.19.7")
         testImplementation("org.testcontainers:mysql:1.19.7")
 
-        implementation("software.amazon.awssdk:dynamodb:2.25.2")
+        implementation("software.amazon.awssdk:dynamodb:2.25.3")
         implementation("javax.validation:validation-api:2.0.1.Final")
 
         implementation("io.projectreactor:reactor-core:3.6.3")
@@ -180,7 +180,7 @@ project(":command:processor") {
         implementation(project(":command:domain"))
         implementation(project(":command:interface-adaptor-if"))
         implementation("org.springframework:spring-context")
-        implementation("com.github.j5ik2o:event-store-adapter-java:1.1.108")
+        implementation("com.github.j5ik2o:event-store-adapter-java:1.1.109")
     }
 }
 
@@ -193,10 +193,10 @@ project(":query:interface-adaptor") {
         implementation("org.springframework:spring-context")
         implementation("org.springframework.boot:spring-boot-starter-graphql")
         implementation("com.graphql-java:graphql-java:21.3")
-        implementation("org.mybatis.spring.boot:mybatis-spring-boot-starter:2.3.2")
+        implementation("org.mybatis.spring.boot:mybatis-spring-boot-starter:3.0.3")
         testImplementation("org.mybatis.spring.boot:mybatis-spring-boot-starter-test:3.0.3")
         testImplementation("org.flywaydb:flyway-core:10.9.0")
-        testImplementation("org.flywaydb:flyway-mysql:10.8.1")
+        testImplementation("org.flywaydb:flyway-mysql:10.9.0")
     }
 
     tasks.named<GraphQLCodegenGradleTask>("graphqlCodegen") {
@@ -232,12 +232,12 @@ project(":query:interface-adaptor") {
 project(":rmu") {
     dependencies {
         implementation(project(":infrastructure"))
-        implementation("org.mybatis.spring.boot:mybatis-spring-boot-starter:2.3.2")
+        implementation("org.mybatis.spring.boot:mybatis-spring-boot-starter:3.0.3")
         testImplementation("org.mybatis.spring.boot:mybatis-spring-boot-starter-test:3.0.3")
         testImplementation("org.flywaydb:flyway-core:10.9.0")
-        testImplementation("org.flywaydb:flyway-mysql:10.8.1")
         implementation("com.amazonaws:aws-lambda-java-events:3.11.4")
         implementation("com.amazonaws:aws-lambda-java-core:1.2.3")
+        testImplementation("org.flywaydb:flyway-mysql:10.9.0")
     }
 }
 
