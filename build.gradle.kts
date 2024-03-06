@@ -235,6 +235,8 @@ project(":rmu") {
         implementation("org.mybatis.spring.boot:mybatis-spring-boot-starter:3.0.3")
         testImplementation("org.mybatis.spring.boot:mybatis-spring-boot-starter-test:3.0.3")
         testImplementation("org.flywaydb:flyway-core:10.9.0")
+        implementation("com.amazonaws:aws-lambda-java-events:3.11.4")
+        implementation("com.amazonaws:aws-lambda-java-core:1.2.3")
         testImplementation("org.flywaydb:flyway-mysql:10.9.0")
     }
 }
