@@ -6,5 +6,6 @@ public record MemberRecord(
     String id,
     String groupChatId,
     String userAccountId,
+    String role,
     LocalDateTime createdAt,
     LocalDateTime updatedAt) {}
