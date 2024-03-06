@@ -232,12 +232,22 @@ project(":query:interface-adaptor") {
 project(":rmu") {
     dependencies {
         implementation(project(":infrastructure"))
+        implementation(project(":command:interface-adaptor-impl"))
+        implementation(project(":command:domain"))
+
         implementation("org.mybatis.spring.boot:mybatis-spring-boot-starter:3.0.3")
         testImplementation("org.mybatis.spring.boot:mybatis-spring-boot-starter-test:3.0.3")
+
         testImplementation("org.flywaydb:flyway-core:10.9.0")
+        testImplementation("org.flywaydb:flyway-mysql:10.9.0")
+
         implementation("com.amazonaws:aws-lambda-java-events:3.11.4")
         implementation("com.amazonaws:aws-lambda-java-core:1.2.3")
-        testImplementation("org.flywaydb:flyway-mysql:10.9.0")
+        implementation("com.github.j5ik2o:event-store-adapter-java:1.1.108")
+
+        implementation("com.fasterxml.jackson.core:jackson-databind:2.16.1")
+        implementation("com.fasterxml.jackson.core:jackson-annotations:2.16.1")
+        implementation("com.fasterxml.jackson.datatype:jackson-datatype-jsr310:2.16.1")
     }
 }
 
