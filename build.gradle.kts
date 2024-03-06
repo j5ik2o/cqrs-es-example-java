@@ -196,7 +196,7 @@ project(":query:interface-adaptor") {
         implementation("org.mybatis.spring.boot:mybatis-spring-boot-starter:2.3.2")
         testImplementation("org.mybatis.spring.boot:mybatis-spring-boot-starter-test:3.0.3")
         testImplementation("org.flywaydb:flyway-core:10.9.0")
-        testImplementation("org.flywaydb:flyway-mysql:10.8.1")
+        testImplementation("org.flywaydb:flyway-mysql:10.9.0")
     }
 
     tasks.named<GraphQLCodegenGradleTask>("graphqlCodegen") {
@@ -235,7 +235,7 @@ project(":rmu") {
         implementation("org.mybatis.spring.boot:mybatis-spring-boot-starter:2.3.2")
         testImplementation("org.mybatis.spring.boot:mybatis-spring-boot-starter-test:3.0.3")
         testImplementation("org.flywaydb:flyway-core:10.9.0")
-        testImplementation("org.flywaydb:flyway-mysql:10.8.1")
+        testImplementation("org.flywaydb:flyway-mysql:10.9.0")
     }
 }
 
