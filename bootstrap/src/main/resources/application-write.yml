@@ -2,7 +2,5 @@ spring:
   config:
     import: classpath:application-common.yml
   graphql:
-    graphiql:
-      enabled: true
     schema:
       locations: classpath*:graphql-write/**/
