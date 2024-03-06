@@ -3,7 +3,6 @@ package com.github.j5ik2o.cqrs.es.java.query.interface_adaptor.graphql;
 import com.github.j5ik2o.cqrs.es.java.query.interface_adaptor.dao.GroupChatMapper;
 import com.github.j5ik2o.cqrs.es.java.query.interface_adaptor.dao.MemberMapper;
 import com.github.j5ik2o.cqrs.es.java.query.interface_adaptor.dao.MessageMapper;
-import org.apache.ibatis.annotations.Arg;
 import org.springframework.context.annotation.Profile;
 import org.springframework.graphql.data.method.annotation.Argument;
 import org.springframework.graphql.data.method.annotation.QueryMapping;
@@ -29,7 +28,8 @@ public class QueryResolverImpl implements QueryResolver {
 
   @QueryMapping
   @Override
-  public Mono<GroupChatOutput> getGroupChat(@Argument("groupChatId") String groupChatId, @Argument("userAccountId") String userAccountId)
+  public Mono<GroupChatOutput> getGroupChat(
+      @Argument("groupChatId") String groupChatId, @Argument("userAccountId") String userAccountId)
       throws Exception {
     return Mono.justOrEmpty(
         groupChatMapper
@@ -46,7 +46,8 @@ public class QueryResolverImpl implements QueryResolver {
 
   @QueryMapping
   @Override
-  public Flux<GroupChatOutput> getGroupChats(@Argument("userAccountId") String userAccountId) throws Exception {
+  public Flux<GroupChatOutput> getGroupChats(@Argument("userAccountId") String userAccountId)
+      throws Exception {
     return Flux.fromArray(
         groupChatMapper.getGroupChats(userAccountId).stream()
             .map(
@@ -62,7 +63,9 @@ public class QueryResolverImpl implements QueryResolver {
 
   @QueryMapping
   @Override
-  public Mono<MemberOutput> getMember(@Argument("groupChatId") String groupChatId, @Argument("userAccountId") String userAccountId) throws Exception {
+  public Mono<MemberOutput> getMember(
+      @Argument("groupChatId") String groupChatId, @Argument("userAccountId") String userAccountId)
+      throws Exception {
     return Mono.justOrEmpty(
         memberMapper
             .getMember(groupChatId, userAccountId)
@@ -79,7 +82,9 @@ public class QueryResolverImpl implements QueryResolver {
 
   @QueryMapping
   @Override
-  public Flux<MemberOutput> getMembers(@Argument("groupChatId") String groupChatId, @Argument("userAccountId") String userAccountId) throws Exception {
+  public Flux<MemberOutput> getMembers(
+      @Argument("groupChatId") String groupChatId, @Argument("userAccountId") String userAccountId)
+      throws Exception {
     return Flux.just(
         memberMapper.getMembers(groupChatId, userAccountId).stream()
             .map(
@@ -96,7 +101,9 @@ public class QueryResolverImpl implements QueryResolver {
 
   @QueryMapping
   @Override
-  public Mono<MessageOutput> getMessage(@Argument("messageId") String messageId, @Argument("userAccountId") String userAccountId) throws Exception {
+  public Mono<MessageOutput> getMessage(
+      @Argument("messageId") String messageId, @Argument("userAccountId") String userAccountId)
+      throws Exception {
     return Mono.justOrEmpty(
         messageMapper
             .getMessage(messageId, userAccountId)
@@ -113,7 +120,8 @@ public class QueryResolverImpl implements QueryResolver {
 
   @QueryMapping
   @Override
-  public Flux<MessageOutput> getMessages(@Argument("groupChatId") String groupChatId, @Argument("userAccountId") String userAccountId)
+  public Flux<MessageOutput> getMessages(
+      @Argument("groupChatId") String groupChatId, @Argument("userAccountId") String userAccountId)
       throws Exception {
     return Flux.just(
         messageMapper.getMessages(groupChatId, userAccountId).stream()
