@@ -1,11 +1,11 @@
 package com.github.j5ik2o.cqrs.es.java.rmu.dao;
 
-import java.time.LocalDateTime;
+import java.time.Instant;
 
 public record MessageRecord(
     String id,
     String groupChatId,
     String content,
     String senderId,
-    LocalDateTime createdAt,
-    LocalDateTime updatedAt) {}
+    Instant createdAt,
+    Instant updatedAt) {}
