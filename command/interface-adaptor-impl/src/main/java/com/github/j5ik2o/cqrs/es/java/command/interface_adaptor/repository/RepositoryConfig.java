@@ -10,9 +10,11 @@ import io.vavr.control.Option;
 import java.util.function.BiPredicate;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.context.annotation.Profile;
 import software.amazon.awssdk.services.dynamodb.DynamoDbAsyncClient;
 
 @Configuration
+@Profile("write")
 public class RepositoryConfig {
   private static final String JOURNAL_TABLE_NAME = "journal";
   private static final String SNAPSHOT_TABLE_NAME = "snapshot";

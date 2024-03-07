@@ -6,9 +6,11 @@ import com.github.j5ik2o.cqrs.es.java.domain.useraccount.UserAccountId;
 import io.vavr.Tuple2;
 import java.util.concurrent.CompletableFuture;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.context.annotation.Profile;
 import org.springframework.stereotype.Component;
 
 @Component
+@Profile("write")
 public class GroupChatCommandProcessor {
 
   private final GroupChatRepository groupChatRepository;

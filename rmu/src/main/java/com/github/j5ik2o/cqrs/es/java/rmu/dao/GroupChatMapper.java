@@ -17,6 +17,10 @@ public interface GroupChatMapper {
   @Flush
   int updateGroupChat(GroupChatRecord groupChatRecord);
 
+  @Update("UPDATE group_chats SET name = #{name}, updated_at = #{updatedAt} WHERE id = #{id}")
+  @Flush
+  int updateGroupChatName(String id, String name);
+
   @Update("UPDATE group_chats SET disabled = 1 WHERE id = #{id}")
   @Flush
   int deleteGroupChat(String id);
