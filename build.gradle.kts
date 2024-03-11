@@ -266,5 +266,8 @@ project(":bootstrap") {
         implementation(project(":command:processor"))
         implementation(project(":query:interface-adaptor"))
         implementation(project(":rmu"))
+
+        implementation("software.amazon.awssdk:dynamodb:2.21.26")
+        implementation("com.amazonaws:aws-lambda-java-events:3.11.4")
     }
 }

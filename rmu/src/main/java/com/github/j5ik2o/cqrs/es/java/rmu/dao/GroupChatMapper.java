@@ -12,11 +12,6 @@ public interface GroupChatMapper {
   @Flush
   int insertGroupChat(GroupChatRecord groupChatRecord);
 
-  @Update(
-      "UPDATE group_chats SET name = #{name}, owner_id = #{ownerId}, updated_at = #{updatedAt} WHERE id = #{id}")
-  @Flush
-  int updateGroupChat(GroupChatRecord groupChatRecord);
-
   @Update("UPDATE group_chats SET name = #{name}, updated_at = #{updatedAt} WHERE id = #{id}")
   @Flush
   int updateGroupChatName(String id, String name);
