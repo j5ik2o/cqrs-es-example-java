@@ -141,7 +141,7 @@ project(":command:interface-adaptor-impl") {
         implementation("software.amazon.awssdk:dynamodb:2.25.7")
         implementation("javax.validation:validation-api:2.0.1.Final")
 
-        implementation("io.projectreactor:reactor-core:3.6.3")
+        implementation("io.projectreactor:reactor-core:3.6.4")
     }
 
     tasks.named<GraphQLCodegenGradleTask>("graphqlCodegen") {
@@ -188,7 +188,7 @@ project(":query:interface-adaptor") {
     apply(plugin = "io.github.kobylynskyi.graphql.codegen")
     dependencies {
         implementation(project(":infrastructure"))
-        implementation("io.projectreactor:reactor-core:3.6.3")
+        implementation("io.projectreactor:reactor-core:3.6.4")
         implementation("javax.validation:validation-api:2.0.1.Final")
         implementation("org.springframework:spring-context")
         implementation("org.springframework.boot:spring-boot-starter-graphql")
