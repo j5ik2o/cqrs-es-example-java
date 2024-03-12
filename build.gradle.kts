@@ -138,7 +138,7 @@ project(":command:interface-adaptor-impl") {
         testImplementation("org.testcontainers:localstack:1.19.7")
         testImplementation("org.testcontainers:mysql:1.19.7")
 
-        implementation("software.amazon.awssdk:dynamodb:2.25.6")
+        implementation("software.amazon.awssdk:dynamodb:2.25.7")
         implementation("javax.validation:validation-api:2.0.1.Final")
 
         implementation("io.projectreactor:reactor-core:3.6.3")
@@ -267,7 +267,7 @@ project(":bootstrap") {
         implementation(project(":query:interface-adaptor"))
         implementation(project(":rmu"))
 
-        implementation("software.amazon.awssdk:dynamodb:2.21.26")
+        implementation("software.amazon.awssdk:dynamodb:2.25.7")
         implementation("com.amazonaws:aws-lambda-java-events:3.11.4")
     }
 }
