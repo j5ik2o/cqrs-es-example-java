@@ -1,22 +1,19 @@
 package com.github.j5ik2o.cqrs.es.java.main;
 
 import org.apache.commons.cli.*;
+import org.mybatis.spring.annotation.MapperScan;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
-import org.springframework.boot.autoconfigure.jdbc.DataSourceAutoConfiguration;
-import org.springframework.boot.autoconfigure.jdbc.DataSourceTransactionManagerAutoConfiguration;
-import org.springframework.boot.autoconfigure.orm.jpa.HibernateJpaAutoConfiguration;
 import org.springframework.context.annotation.ComponentScan;
 import org.springframework.core.env.ConfigurableEnvironment;
 import org.springframework.core.env.StandardEnvironment;
 
-@SpringBootApplication(
-    exclude = {
-      DataSourceAutoConfiguration.class,
-      DataSourceTransactionManagerAutoConfiguration.class,
-      HibernateJpaAutoConfiguration.class
-    })
+@SpringBootApplication
 @ComponentScan(basePackages = {"com.github.j5ik2o.cqrs.es.java"})
+@MapperScan({
+  "com.github.j5ik2o.cqrs.es.java.rmu.dao",
+  "com.github.j5ik2o.cqrs.es.java.query.interface_adaptor.dao"
+})
 public class Main {
   public static void main(String[] args) throws ParseException {
 

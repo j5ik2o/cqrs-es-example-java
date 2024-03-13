@@ -23,13 +23,20 @@ import software.amazon.awssdk.services.dynamodb.streams.DynamoDbStreamsClient;
 public class CommandLineRunnerImpl implements CommandLineRunner {
   static final Logger LOGGER = LoggerFactory.getLogger(CommandLineRunnerImpl.class);
   private final ReadModelUpdater readModelUpdater;
+  private final AppConfig appConfig;
 
-  public CommandLineRunnerImpl(ReadModelUpdater readModelUpdater) {
+  public CommandLineRunnerImpl(ReadModelUpdater readModelUpdater, AppConfig appConfig) {
     this.readModelUpdater = readModelUpdater;
+    this.appConfig = appConfig;
   }
 
   @Override
-  public void run(String... args) throws Exception {}
+  public void run(String... args) throws Exception {
+    LOGGER.info("appConfig = {}", appConfig);
+    // var dynamodbClient = DynamoDbClient.create();
+    // var dynamodbStreamsClient = DynamoDbStreamsClient.create();
+    // streamDriver(dynamodbClient, dynamodbStreamsClient, appConfig.getJournalTableName(), 100);
+  }
 
   private Map<String, AttributeValue> getItem(Record record) {
     var streamRecord = record.dynamodb();

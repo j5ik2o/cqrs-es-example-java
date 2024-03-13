@@ -1,8 +1,8 @@
 package com.github.j5ik2o.cqrs.es.java.query.interface_adaptor.graphql;
 
-import com.github.j5ik2o.cqrs.es.java.query.interface_adaptor.dao.GroupChatMapper;
-import com.github.j5ik2o.cqrs.es.java.query.interface_adaptor.dao.MemberMapper;
-import com.github.j5ik2o.cqrs.es.java.query.interface_adaptor.dao.MessageMapper;
+import com.github.j5ik2o.cqrs.es.java.query.interface_adaptor.dao.GroupChatReadMapper;
+import com.github.j5ik2o.cqrs.es.java.query.interface_adaptor.dao.MemberReadMapper;
+import com.github.j5ik2o.cqrs.es.java.query.interface_adaptor.dao.MessageReadMapper;
 import org.springframework.context.annotation.Profile;
 import org.springframework.graphql.data.method.annotation.Argument;
 import org.springframework.graphql.data.method.annotation.QueryMapping;
@@ -14,16 +14,18 @@ import reactor.core.publisher.Mono;
 @Profile("read")
 public class QueryResolverImpl implements QueryResolver {
 
-  private final GroupChatMapper groupChatMapper;
-  private final MemberMapper memberMapper;
+  private final GroupChatReadMapper groupChatReadMapper;
+  private final MemberReadMapper memberReadMapper;
 
-  private final MessageMapper messageMapper;
+  private final MessageReadMapper messageReadMapper;
 
   public QueryResolverImpl(
-      GroupChatMapper groupChatMapper, MemberMapper memberMapper, MessageMapper messageMapper) {
-    this.groupChatMapper = groupChatMapper;
-    this.memberMapper = memberMapper;
-    this.messageMapper = messageMapper;
+      GroupChatReadMapper groupChatReadMapper,
+      MemberReadMapper memberReadMapper,
+      MessageReadMapper messageReadMapper) {
+    this.groupChatReadMapper = groupChatReadMapper;
+    this.memberReadMapper = memberReadMapper;
+    this.messageReadMapper = messageReadMapper;
   }
 
   @QueryMapping
@@ -32,7 +34,7 @@ public class QueryResolverImpl implements QueryResolver {
       @Argument("groupChatId") String groupChatId, @Argument("userAccountId") String userAccountId)
       throws Exception {
     return Mono.justOrEmpty(
-        groupChatMapper
+        groupChatReadMapper
             .getGroupChat(groupChatId, userAccountId)
             .map(
                 groupChatRecord ->
@@ -49,7 +51,7 @@ public class QueryResolverImpl implements QueryResolver {
   public Flux<GroupChatOutput> getGroupChats(@Argument("userAccountId") String userAccountId)
       throws Exception {
     return Flux.fromArray(
-        groupChatMapper.getGroupChats(userAccountId).stream()
+        groupChatReadMapper.getGroupChats(userAccountId).stream()
             .map(
                 groupChatRecord ->
                     new GroupChatOutput(
@@ -67,7 +69,7 @@ public class QueryResolverImpl implements QueryResolver {
       @Argument("groupChatId") String groupChatId, @Argument("userAccountId") String userAccountId)
       throws Exception {
     return Mono.justOrEmpty(
-        memberMapper
+        memberReadMapper
             .getMember(groupChatId, userAccountId)
             .map(
                 memberRecord ->
@@ -86,7 +88,7 @@ public class QueryResolverImpl implements QueryResolver {
       @Argument("groupChatId") String groupChatId, @Argument("userAccountId") String userAccountId)
       throws Exception {
     return Flux.just(
-        memberMapper.getMembers(groupChatId, userAccountId).stream()
+        memberReadMapper.getMembers(groupChatId, userAccountId).stream()
             .map(
                 memberRecord ->
                     new MemberOutput(
@@ -105,7 +107,7 @@ public class QueryResolverImpl implements QueryResolver {
       @Argument("messageId") String messageId, @Argument("userAccountId") String userAccountId)
       throws Exception {
     return Mono.justOrEmpty(
-        messageMapper
+        messageReadMapper
             .getMessage(messageId, userAccountId)
             .map(
                 messageRecord ->
@@ -124,7 +126,7 @@ public class QueryResolverImpl implements QueryResolver {
       @Argument("groupChatId") String groupChatId, @Argument("userAccountId") String userAccountId)
       throws Exception {
     return Flux.just(
-        messageMapper.getMessages(groupChatId, userAccountId).stream()
+        messageReadMapper.getMessages(groupChatId, userAccountId).stream()
             .map(
                 messageRecord ->
                     new MessageOutput(

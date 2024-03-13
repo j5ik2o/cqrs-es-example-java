@@ -269,5 +269,7 @@ project(":bootstrap") {
 
         implementation("software.amazon.awssdk:dynamodb:2.25.7")
         implementation("com.amazonaws:aws-lambda-java-events:3.11.4")
+        implementation("org.springframework.boot:spring-boot-configuration-processor")
+        implementation("org.mybatis.spring.boot:mybatis-spring-boot-starter:3.0.3")
     }
 }

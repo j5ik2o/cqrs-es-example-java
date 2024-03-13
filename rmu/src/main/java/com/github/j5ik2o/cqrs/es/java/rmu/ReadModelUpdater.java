@@ -11,16 +11,18 @@ import org.springframework.stereotype.Component;
 
 @Component
 public class ReadModelUpdater {
-  private final GroupChatMapper groupChatMapper;
-  private final MessageMapper messageMapper;
-  private final MemberMapper memberMapper;
+  private final GroupChatWriteMapper groupChatWriteMapper;
+  private final MessageWriteMapper messageWriteMapper;
+  private final MemberWriteMapper memberWriteMapper;
   GroupChatEventSerializer serializer = new GroupChatEventSerializer();
 
   public ReadModelUpdater(
-      GroupChatMapper groupChatMapper, MessageMapper messageMapper, MemberMapper memberMapper) {
-    this.groupChatMapper = groupChatMapper;
-    this.messageMapper = messageMapper;
-    this.memberMapper = memberMapper;
+      GroupChatWriteMapper groupChatWriteMapper,
+      MessageWriteMapper messageWriteMapper,
+      MemberWriteMapper memberWriteMapper) {
+    this.groupChatWriteMapper = groupChatWriteMapper;
+    this.messageWriteMapper = messageWriteMapper;
+    this.memberWriteMapper = memberWriteMapper;
   }
 
   public void update(DynamodbEvent dynamodbEvent) {
@@ -70,15 +72,15 @@ public class ReadModelUpdater {
   }
 
   private void deleteMessage(GroupChatEvent.MessageDeleted typedEvent) {
-    messageMapper.deleteMessage(typedEvent.aggregateId().asString());
+    messageWriteMapper.deleteMessage(typedEvent.aggregateId().asString());
   }
 
   private void deleteGroupChat(GroupChatEvent.Deleted typedEvent) {
-    groupChatMapper.deleteGroupChat(typedEvent.aggregateId().asString());
+    groupChatWriteMapper.deleteGroupChat(typedEvent.aggregateId().asString());
   }
 
   private void removeMember(GroupChatEvent.MemberRemoved typedEvent) {
-    memberMapper.deleteMember(
+    memberWriteMapper.deleteMember(
         typedEvent.aggregateId().asString(), typedEvent.member().getUserAccountId().asString());
   }
 
@@ -91,7 +93,7 @@ public class ReadModelUpdater {
             typedEvent.executorId().asString(),
             typedEvent.occurredAt(),
             typedEvent.occurredAt());
-    memberMapper.insertMember(memberRecord);
+    memberWriteMapper.insertMember(memberRecord);
   }
 
   private void insertMessage(GroupChatEvent.MessagePosted typedEvent) {
@@ -103,11 +105,11 @@ public class ReadModelUpdater {
             typedEvent.message().getSenderId().asString(),
             typedEvent.occurredAt(),
             typedEvent.occurredAt());
-    messageMapper.insertMessage(messageRecord);
+    messageWriteMapper.insertMessage(messageRecord);
   }
 
   private void renameGroupChat(GroupChatEvent.Renamed typedEvent) {
-    groupChatMapper.updateGroupChatName(
+    groupChatWriteMapper.updateGroupChatName(
         typedEvent.aggregateId().asString(), typedEvent.name().asString());
   }
 
@@ -119,7 +121,7 @@ public class ReadModelUpdater {
             typedEvent.executorId().asString(),
             typedEvent.occurredAt(),
             typedEvent.occurredAt());
-    groupChatMapper.insertGroupChat(groupChatRecord);
+    groupChatWriteMapper.insertGroupChat(groupChatRecord);
     var memberId = MemberId.generate();
     var memberRecord =
         new MemberRecord(
@@ -128,6 +130,6 @@ public class ReadModelUpdater {
             typedEvent.executorId().asString(),
             typedEvent.occurredAt(),
             typedEvent.occurredAt());
-    memberMapper.insertMember(memberRecord);
+    memberWriteMapper.insertMember(memberRecord);
   }
 }

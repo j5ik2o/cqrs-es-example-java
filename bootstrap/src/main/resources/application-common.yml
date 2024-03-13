@@ -1,9 +1,19 @@
 server:
   port: 48080
+
 spring:
   graphql:
     graphiql:
       enabled: true
+  datasource:
+    driver-class-name: com.mysql.cj.jdbc.Driver
+    url: jdbc:mysql://localhost:3306/test
+    username: sa
+    password:
 logging:
   level:
     root: debug
+app:
+  region: us-west-2
+  apiHost: localhost
+  journal-table-name: journal
