@@ -75,6 +75,7 @@ public class LocalRMUMain implements CommandLineRunner {
         LOGGER.warn(
             "An error has occurred, but stream processing is restarted. If this error persists, the read model condition may be incorrect.",
             ex);
+        Thread.sleep(1000L);
       }
     }
   }
