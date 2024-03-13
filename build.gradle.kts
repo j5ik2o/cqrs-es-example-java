@@ -101,7 +101,7 @@ project(":command:domain") {
         implementation("com.github.j5ik2o:event-store-adapter-java:1.1.115")
         implementation(project(":infrastructure"))
         implementation("com.github.f4b6a3:ulid-creator:5.2.3")
-        implementation("com.fasterxml.jackson.core:jackson-databind:2.16.2")
+        implementation("com.fasterxml.jackson.core:jackson-databind:2.17.0")
         implementation("com.fasterxml.jackson.core:jackson-annotations:2.17.0")
         implementation("com.fasterxml.jackson.datatype:jackson-datatype-jsr310:2.16.2")
     }
@@ -245,7 +245,7 @@ project(":rmu") {
         implementation("com.amazonaws:aws-lambda-java-core:1.2.3")
         implementation("com.github.j5ik2o:event-store-adapter-java:1.1.115")
 
-        implementation("com.fasterxml.jackson.core:jackson-databind:2.16.2")
+        implementation("com.fasterxml.jackson.core:jackson-databind:2.17.0")
         implementation("com.fasterxml.jackson.core:jackson-annotations:2.17.0")
         implementation("com.fasterxml.jackson.datatype:jackson-datatype-jsr310:2.16.2")
     }
