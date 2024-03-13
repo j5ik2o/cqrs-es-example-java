@@ -40,23 +40,23 @@ public class CommandLineRunnerImpl implements CommandLineRunner {
     LOGGER.info("appConfig = {}", appConfig);
     DynamoDbClientBuilder dynamodbClientBuilder = null;
     DynamoDbStreamsClientBuilder dynamoDbStreamsClientBuilder = null;
-    if (appConfig.getDynamoDbConfig().hasConfig()) {
+    if (appConfig.hasDynamoDbConfig()) {
       dynamodbClientBuilder =
           DynamoDbClient.builder()
-              .endpointOverride(URI.create(appConfig.getDynamoDbConfig().getEndpointUrl()))
+              .endpointOverride(URI.create(appConfig.getDynamoDb().getEndpointUrl()))
               .credentialsProvider(
                   StaticCredentialsProvider.create(
                       AwsBasicCredentials.create(
-                          appConfig.getDynamoDbConfig().getAccessKey(),
-                          appConfig.getDynamoDbConfig().getSecretAccessKey())));
+                          appConfig.getDynamoDb().getAccessKey(),
+                          appConfig.getDynamoDb().getSecretAccessKey())));
       dynamoDbStreamsClientBuilder =
           DynamoDbStreamsClient.builder()
-              .endpointOverride(URI.create(appConfig.getDynamoDbConfig().getEndpointUrl()))
+              .endpointOverride(URI.create(appConfig.getDynamoDb().getEndpointUrl()))
               .credentialsProvider(
                   StaticCredentialsProvider.create(
                       AwsBasicCredentials.create(
-                          appConfig.getDynamoDbConfig().getAccessKey(),
-                          appConfig.getDynamoDbConfig().getSecretAccessKey())));
+                          appConfig.getDynamoDb().getAccessKey(),
+                          appConfig.getDynamoDb().getSecretAccessKey())));
     } else {
       dynamodbClientBuilder = DynamoDbClient.builder();
       dynamoDbStreamsClientBuilder = DynamoDbStreamsClient.builder();
@@ -66,7 +66,11 @@ public class CommandLineRunnerImpl implements CommandLineRunner {
 
     while (true) {
       try {
-        streamDriver(dynamodbClient, dynamodbStreamsClient, appConfig.getJournalTableName(), 100);
+        streamDriver(
+            dynamodbClient,
+            dynamodbStreamsClient,
+            appConfig.getStream().getJournalTableName(),
+            appConfig.getStream().getMaxItemCount());
       } catch (Exception ex) {
         LOGGER.warn(
             "An error has occurred, but stream processing is restarted. If this error persists, the read model condition may be incorrect.",
