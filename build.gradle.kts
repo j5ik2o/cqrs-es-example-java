@@ -271,5 +271,14 @@ project(":bootstrap") {
         implementation("com.amazonaws:aws-lambda-java-events:3.11.4")
         implementation("org.springframework.boot:spring-boot-configuration-processor")
         implementation("org.mybatis.spring.boot:mybatis-spring-boot-starter:3.0.3")
+        compileOnly("org.projectlombok:lombok")
+        annotationProcessor("org.projectlombok:lombok")
+    }
+
+    configurations {
+        compileOnly {
+            extendsFrom(annotationProcessor.get())
+        }
     }
 }
+

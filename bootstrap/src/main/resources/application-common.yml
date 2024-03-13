@@ -14,6 +14,9 @@ logging:
   level:
     root: debug
 app:
-  region: us-west-2
-  apiHost: localhost
   journal-table-name: journal
+  dynamo-db-config:
+    region: ap-northeast-1
+    endpoint-url: http://localhost:8000
+    access-key: x
+    secret-access-key: x
