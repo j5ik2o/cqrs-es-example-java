@@ -102,7 +102,7 @@ project(":command:domain") {
         implementation(project(":infrastructure"))
         implementation("com.github.f4b6a3:ulid-creator:5.2.3")
         implementation("com.fasterxml.jackson.core:jackson-databind:2.16.2")
-        implementation("com.fasterxml.jackson.core:jackson-annotations:2.16.2")
+        implementation("com.fasterxml.jackson.core:jackson-annotations:2.17.0")
         implementation("com.fasterxml.jackson.datatype:jackson-datatype-jsr310:2.16.2")
     }
 }
@@ -111,7 +111,7 @@ project(":command:interface-adaptor-if") {
     dependencies {
         implementation(project(":infrastructure"))
         implementation(project(":command:domain"))
-        implementation("com.fasterxml.jackson.core:jackson-annotations:2.16.2")
+        implementation("com.fasterxml.jackson.core:jackson-annotations:2.17.0")
         implementation("com.fasterxml.jackson.datatype:jackson-datatype-jsr310:2.16.2")
     }
 }
@@ -246,7 +246,7 @@ project(":rmu") {
         implementation("com.github.j5ik2o:event-store-adapter-java:1.1.114")
 
         implementation("com.fasterxml.jackson.core:jackson-databind:2.16.2")
-        implementation("com.fasterxml.jackson.core:jackson-annotations:2.16.2")
+        implementation("com.fasterxml.jackson.core:jackson-annotations:2.17.0")
         implementation("com.fasterxml.jackson.datatype:jackson-datatype-jsr310:2.16.2")
     }
 }
