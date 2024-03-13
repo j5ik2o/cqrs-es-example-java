@@ -6,7 +6,7 @@ import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Select;
 
 @Mapper
-public interface GroupChatMapper {
+public interface GroupChatReadMapper {
   @Select(
       """
            SELECT gc.id, gc.name, gc.owner_id, gc.created_at, gc.updated_at

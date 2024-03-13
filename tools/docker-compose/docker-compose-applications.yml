@@ -1,0 +1,72 @@
+version: '3.6'
+services:
+  write-api-server-1:
+    image: write-api-server:latest-${ARCH}
+    container_name: write-api-server-rs-1
+    ports:
+      - 18080:8080
+    environment:
+      AWS_REGION: ap-northeast-1
+      RUST_LOG: debug
+      RUST_BACKTRACE: full
+      APP_API_HOST: "0.0.0.0"
+      APP_API_PORT: 8080
+      APP_API_ALLOW_ORIGINS: "http://localhost:18080,http://localhost:18082,http://localhost:8888"
+      APP_PERSISTENCE_JOURNAL_TABLE_NAME: journal
+      APP_PERSISTENCE_JOURNAL_AID_INDEX_NAME: journal-aid-index
+      APP_PERSISTENCE_SNAPSHOT_TABLE_NAME: snapshot
+      APP_PERSISTENCE_SNAPSHOT_AID_INDEX_NAME: snapshot-aid-index
+      APP_PERSISTENCE_SHARD_COUNT: 64
+      APP_PERSISTENCE_SNAPSHOT_INTERVAL: 10
+      APP_DYNAMODB_REGION_NAME: ${AWS_REGION}
+      APP_DYNAMODB_ENDPOINT_URL: http://localstack:4566
+      APP_DYNAMODB_ACCESS_KEY_ID: x
+      APP_DYNAMODB_SECRET_ACCESS_KEY: x
+    depends_on:
+      - localstack
+      - dynamodb-admin
+      - dynamodb-setup
+  read-model-updater-1:
+    image: read-model-updater-local:latest-${ARCH}
+    container_name: read-model-updater-rs-1
+    ports:
+      - 18081:8080
+    environment:
+      AWS_REGION: ap-northeast-1
+      RUST_LOG: debug
+      RUST_BACKTRACE: full
+      APP_API_HOST: "0.0.0.0"
+      APP_API_PORT: 8080
+      APP_DYNAMODB_REGION_NAME: ${AWS_REGION}
+      APP_DYNAMODB_ENDPOINT_URL: http://localstack:4566
+      APP_DYNAMODB_ACCESS_KEY_ID: x
+      APP_DYNAMODB_SECRET_ACCESS_KEY: x
+      APP_STREAM_JOURNAL_TABLE_NAME: journal
+      APP_STREAM_MAX_ITEM_COUNT: 32
+      SPRING_DATASOURCE_URL: jdbc:mysql://mysql-local:3306/ceer
+      SPRING_DATASOURCE_USERNAME: ceer
+      SPRING_DATASOURCE_PASSWORD: ceer
+    depends_on:
+      - localstack
+      - dynamodb-admin
+      - dynamodb-setup
+  read-api-server-1:
+    image: read-api-server:latest-${ARCH}
+    container_name: read-api-server-rs-1
+    ports:
+      - 18082:8080
+    environment:
+      AWS_REGION: ap-northeast-1
+      RUST_LOG: debug
+      RUST_BACKTRACE: full
+      APP_API_HOST: "0.0.0.0"
+      APP_API_PORT: 8080
+      APP_API_ALLOW_ORIGINS: "http://localhost:18080,http://localhost:18082,http://localhost:8888"
+      SPRING_DATASOURCE_URL: jdbc:mysql://mysql-local:3306/ceer
+      SPRING_DATASOURCE_USERNAME: ceer
+      SPRING_DATASOURCE_PASSWORD: ceer
+    depends_on:
+      - mysql
+      - refinery
+      - write-api-server-1
+      - read-model-updater-1

@@ -6,7 +6,7 @@ import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Update;
 
 @Mapper
-public interface MessageMapper {
+public interface MessageWriteMapper {
   @Insert(
       "INSERT INTO messages (id, disabled, group_chat_id, content, sender_id, created_at, updated_at) VALUES(#{id}, 0, #{groupChatId}, #{content}, #{senderId}, #{createdAt}, #{updatedAt})")
   @Flush
