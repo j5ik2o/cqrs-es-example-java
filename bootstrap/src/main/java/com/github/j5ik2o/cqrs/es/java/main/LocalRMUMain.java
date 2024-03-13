@@ -25,12 +25,12 @@ import software.amazon.awssdk.services.dynamodb.streams.DynamoDbStreamsClientBui
 
 @Component
 @Profile("local-rmu")
-public class CommandLineRunnerImpl implements CommandLineRunner {
-  static final Logger LOGGER = LoggerFactory.getLogger(CommandLineRunnerImpl.class);
+public class LocalRMUMain implements CommandLineRunner {
+  static final Logger LOGGER = LoggerFactory.getLogger(LocalRMUMain.class);
   private final ReadModelUpdater readModelUpdater;
   private final AppConfig appConfig;
 
-  public CommandLineRunnerImpl(ReadModelUpdater readModelUpdater, AppConfig appConfig) {
+  public LocalRMUMain(ReadModelUpdater readModelUpdater, AppConfig appConfig) {
     this.readModelUpdater = readModelUpdater;
     this.appConfig = appConfig;
   }
