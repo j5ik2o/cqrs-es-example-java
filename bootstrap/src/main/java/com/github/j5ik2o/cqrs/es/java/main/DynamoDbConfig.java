@@ -8,15 +8,15 @@ import lombok.ToString;
 @Setter
 @ToString
 public class DynamoDbConfig {
-    private String region;
+  private String region;
 
-    private String endpointUrl;
+  private String endpointUrl;
 
-    private String accessKey;
+  private String accessKey;
 
-    private String secretAccessKey;
+  private String secretAccessKey;
 
-    public boolean hasConfig() {
-        return region != null && endpointUrl != null && accessKey != null && secretAccessKey != null;
-    }
+  public boolean hasConfig() {
+    return region != null && endpointUrl != null && accessKey != null && secretAccessKey != null;
+  }
 }

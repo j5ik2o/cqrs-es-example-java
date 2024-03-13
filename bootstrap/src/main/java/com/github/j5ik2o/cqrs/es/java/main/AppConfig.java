@@ -16,6 +16,4 @@ public class AppConfig {
   private String journalTableName;
 
   private DynamoDbConfig dynamoDbConfig;
-
-
 }

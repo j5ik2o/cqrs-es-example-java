@@ -5,7 +5,6 @@ import com.amazonaws.services.lambda.runtime.events.models.dynamodb.AttributeVal
 import com.github.j5ik2o.cqrs.es.java.rmu.ReadModelUpdater;
 import io.vavr.collection.HashMap;
 import io.vavr.collection.Map;
-
 import java.net.URI;
 import java.util.ArrayList;
 import java.util.Date;
@@ -42,26 +41,36 @@ public class CommandLineRunnerImpl implements CommandLineRunner {
     DynamoDbClientBuilder dynamodbClientBuilder = null;
     DynamoDbStreamsClientBuilder dynamoDbStreamsClientBuilder = null;
     if (appConfig.getDynamoDbConfig().hasConfig()) {
-      dynamodbClientBuilder = DynamoDbClient.builder()
+      dynamodbClientBuilder =
+          DynamoDbClient.builder()
               .endpointOverride(URI.create(appConfig.getDynamoDbConfig().getEndpointUrl()))
-              .credentialsProvider(StaticCredentialsProvider.create(
-                      AwsBasicCredentials.create(appConfig.getDynamoDbConfig().getAccessKey(), appConfig.getDynamoDbConfig().getSecretAccessKey())));
-      dynamoDbStreamsClientBuilder = DynamoDbStreamsClient.builder()
+              .credentialsProvider(
+                  StaticCredentialsProvider.create(
+                      AwsBasicCredentials.create(
+                          appConfig.getDynamoDbConfig().getAccessKey(),
+                          appConfig.getDynamoDbConfig().getSecretAccessKey())));
+      dynamoDbStreamsClientBuilder =
+          DynamoDbStreamsClient.builder()
               .endpointOverride(URI.create(appConfig.getDynamoDbConfig().getEndpointUrl()))
-              .credentialsProvider(StaticCredentialsProvider.create(
-                      AwsBasicCredentials.create(appConfig.getDynamoDbConfig().getAccessKey(), appConfig.getDynamoDbConfig().getSecretAccessKey())));
+              .credentialsProvider(
+                  StaticCredentialsProvider.create(
+                      AwsBasicCredentials.create(
+                          appConfig.getDynamoDbConfig().getAccessKey(),
+                          appConfig.getDynamoDbConfig().getSecretAccessKey())));
     } else {
-        dynamodbClientBuilder = DynamoDbClient.builder();
+      dynamodbClientBuilder = DynamoDbClient.builder();
       dynamoDbStreamsClientBuilder = DynamoDbStreamsClient.builder();
     }
     var dynamodbClient = dynamodbClientBuilder.build();
     var dynamodbStreamsClient = dynamoDbStreamsClientBuilder.build();
 
-    while(true) {
+    while (true) {
       try {
         streamDriver(dynamodbClient, dynamodbStreamsClient, appConfig.getJournalTableName(), 100);
-      } catch(Exception ex) {
-        LOGGER.warn("An error has occurred, but stream processing is restarted. If this error persists, the read model condition may be incorrect.", ex);
+      } catch (Exception ex) {
+        LOGGER.warn(
+            "An error has occurred, but stream processing is restarted. If this error persists, the read model condition may be incorrect.",
+            ex);
       }
     }
   }
