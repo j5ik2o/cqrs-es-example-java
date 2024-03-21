@@ -19,6 +19,13 @@ app:
     endpoint-url: http://localhost:8000
     access-key: x
     secret-access-key: x
+  persistence:
+    journal-table-name: journal
+    journal-aid-index-name: journal-aid-index
+    snapshot-table-name: snapshot
+    snapshot-aid-index-name: snapshot-aid-index
+    shard-count: 64
+    snapshot-interval: 10
   stream:
     journal-table-name: journal
     max-item-count: 32
