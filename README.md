@@ -43,3 +43,7 @@ Please refer to [here](https://github.com/j5ik2o/cqrs-es-example) for implementa
 ### System Architecture Diagram
 
 ![](docs/images/system-layout.png)
+
+## Links
+
+- [Common Documents](https://github.com/j5ik2o/cqrs-es-example)
