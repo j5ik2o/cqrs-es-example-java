@@ -1,3 +1,4 @@
+import com.google.cloud.tools.jib.api.buildplan.ImageFormat
 import io.github.kobylynskyi.graphql.codegen.gradle.GraphQLCodegenGradleTask
 import org.springframework.boot.gradle.tasks.bundling.BootJar
 
@@ -7,6 +8,7 @@ plugins {
     id("io.spring.dependency-management") version "1.1.4"
     id("com.diffplug.spotless") version "6.25.0"
     id("io.github.kobylynskyi.graphql.codegen") version "5.10.0"
+    id("com.google.cloud.tools.jib") version "3.2.1"
 }
 
 tasks.getByName<BootJar>("bootJar") {
@@ -65,6 +67,15 @@ subprojects {
 
         testImplementation("org.springframework.boot:spring-boot-starter-test")
         testImplementation("org.springframework.graphql:spring-graphql-test")
+
+        compileOnly("org.projectlombok:lombok")
+        annotationProcessor("org.projectlombok:lombok")
+    }
+
+    configurations {
+        compileOnly {
+            extendsFrom(annotationProcessor.get())
+        }
     }
 
     tasks.getByName<BootJar>("bootJar") {
@@ -252,6 +263,7 @@ project(":rmu") {
 }
 
 project(":bootstrap") {
+    apply(plugin = "com.google.cloud.tools.jib")
 
     tasks.getByName<BootJar>("bootJar") {
         enabled = true
@@ -266,18 +278,22 @@ project(":bootstrap") {
         implementation(project(":command:processor"))
         implementation(project(":query:interface-adaptor"))
         implementation(project(":rmu"))
-
+        implementation("com.github.j5ik2o:event-store-adapter-java:1.1.114")
         implementation("software.amazon.awssdk:dynamodb:2.25.7")
         implementation("com.amazonaws:aws-lambda-java-events:3.11.4")
         implementation("org.springframework.boot:spring-boot-configuration-processor")
         implementation("org.mybatis.spring.boot:mybatis-spring-boot-starter:3.0.3")
-        compileOnly("org.projectlombok:lombok")
-        annotationProcessor("org.projectlombok:lombok")
     }
-
-    configurations {
-        compileOnly {
-            extendsFrom(annotationProcessor.get())
+    jib {
+        to {
+            image = "cqrs-es-example-java"
+        }
+        from {
+            image = "openjdk:17-alpine"
+        }
+        container {
+            ports = listOf("8080")
+            format = ImageFormat.OCI
         }
     }
 }

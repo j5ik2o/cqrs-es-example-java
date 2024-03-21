@@ -5,7 +5,6 @@ import com.amazonaws.services.lambda.runtime.events.models.dynamodb.AttributeVal
 import com.github.j5ik2o.cqrs.es.java.rmu.ReadModelUpdater;
 import io.vavr.collection.HashMap;
 import io.vavr.collection.Map;
-import java.net.URI;
 import java.util.ArrayList;
 import java.util.Date;
 import org.slf4j.Logger;
@@ -13,15 +12,11 @@ import org.slf4j.LoggerFactory;
 import org.springframework.boot.CommandLineRunner;
 import org.springframework.context.annotation.Profile;
 import org.springframework.stereotype.Component;
-import software.amazon.awssdk.auth.credentials.AwsBasicCredentials;
-import software.amazon.awssdk.auth.credentials.StaticCredentialsProvider;
 import software.amazon.awssdk.core.BytesWrapper;
 import software.amazon.awssdk.services.dynamodb.DynamoDbClient;
-import software.amazon.awssdk.services.dynamodb.DynamoDbClientBuilder;
 import software.amazon.awssdk.services.dynamodb.model.*;
 import software.amazon.awssdk.services.dynamodb.model.Record;
 import software.amazon.awssdk.services.dynamodb.streams.DynamoDbStreamsClient;
-import software.amazon.awssdk.services.dynamodb.streams.DynamoDbStreamsClientBuilder;
 
 @Component
 @Profile("local-rmu")
@@ -38,31 +33,8 @@ public class LocalRMUMain implements CommandLineRunner {
   @Override
   public void run(String... args) throws Exception {
     LOGGER.info("appConfig = {}", appConfig);
-    DynamoDbClientBuilder dynamodbClientBuilder = null;
-    DynamoDbStreamsClientBuilder dynamoDbStreamsClientBuilder = null;
-    if (appConfig.hasDynamoDbConfig()) {
-      dynamodbClientBuilder =
-          DynamoDbClient.builder()
-              .endpointOverride(URI.create(appConfig.getDynamoDb().getEndpointUrl()))
-              .credentialsProvider(
-                  StaticCredentialsProvider.create(
-                      AwsBasicCredentials.create(
-                          appConfig.getDynamoDb().getAccessKey(),
-                          appConfig.getDynamoDb().getSecretAccessKey())));
-      dynamoDbStreamsClientBuilder =
-          DynamoDbStreamsClient.builder()
-              .endpointOverride(URI.create(appConfig.getDynamoDb().getEndpointUrl()))
-              .credentialsProvider(
-                  StaticCredentialsProvider.create(
-                      AwsBasicCredentials.create(
-                          appConfig.getDynamoDb().getAccessKey(),
-                          appConfig.getDynamoDb().getSecretAccessKey())));
-    } else {
-      dynamodbClientBuilder = DynamoDbClient.builder();
-      dynamoDbStreamsClientBuilder = DynamoDbStreamsClient.builder();
-    }
-    var dynamodbClient = dynamodbClientBuilder.build();
-    var dynamodbStreamsClient = dynamoDbStreamsClientBuilder.build();
+    var dynamodbClient = appConfig.dynamoDbClient();
+    var dynamodbStreamsClient = appConfig.dynamoDbStreamsClient();
 
     while (true) {
       try {
