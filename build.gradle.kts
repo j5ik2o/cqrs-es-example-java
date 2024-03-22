@@ -161,7 +161,7 @@ project(":command:interface-adaptor-impl") {
         graphqlSchemaPaths = listOf("$projectDir/src/main/resources/graphql-write/schema.graphqls")
         outputDir = File("$projectDir/build/generated")
         packageName = "com.github.j5ik2o.cqrs.es.java.command.interface_adaptor.graphql"
-        customTypesMapping = mutableMapOf(Pair("EpochMillis", "java.time.LocalDateTime"))
+        customTypesMapping = mutableMapOf(Pair("LocalDateTime", "java.time.LocalDateTime"))
         customAnnotationsMapping =
             mutableMapOf(
                 Pair(
@@ -208,6 +208,7 @@ project(":query:interface-adaptor") {
         testImplementation("org.mybatis.spring.boot:mybatis-spring-boot-starter-test:3.0.3")
         testImplementation("org.flywaydb:flyway-core:10.10.0")
         testImplementation("org.flywaydb:flyway-mysql:10.10.0")
+        implementation("com.tailrocks.graphql:graphql-datetime-spring-boot-starter:6.0.0")
     }
 
     tasks.named<GraphQLCodegenGradleTask>("graphqlCodegen") {
@@ -216,7 +217,7 @@ project(":query:interface-adaptor") {
         graphqlSchemaPaths = listOf("$projectDir/src/main/resources/graphql-read/schema.graphqls")
         outputDir = File("$projectDir/build/generated")
         packageName = "com.github.j5ik2o.cqrs.es.java.query.interface_adaptor.graphql"
-        customTypesMapping = mutableMapOf(Pair("EpochMillis", "java.time.LocalDateTime"))
+        customTypesMapping = mutableMapOf(Pair("LocalDateTime", "java.time.LocalDateTime"))
         customAnnotationsMapping =
             mutableMapOf(
                 Pair(

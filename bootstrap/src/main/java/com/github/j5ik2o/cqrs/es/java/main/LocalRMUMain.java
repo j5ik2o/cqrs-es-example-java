@@ -24,17 +24,20 @@ public class LocalRMUMain implements CommandLineRunner {
   static final Logger LOGGER = LoggerFactory.getLogger(LocalRMUMain.class);
   private final ReadModelUpdater readModelUpdater;
   private final AppConfig appConfig;
+  private final DynamoDbConfig dynamoDbConfig;
 
-  public LocalRMUMain(ReadModelUpdater readModelUpdater, AppConfig appConfig) {
+  public LocalRMUMain(
+      ReadModelUpdater readModelUpdater, AppConfig appConfig, DynamoDbConfig dynamoDbConfig) {
     this.readModelUpdater = readModelUpdater;
     this.appConfig = appConfig;
+    this.dynamoDbConfig = dynamoDbConfig;
   }
 
   @Override
   public void run(String... args) throws Exception {
     LOGGER.info("appConfig = {}", appConfig);
-    var dynamodbClient = appConfig.dynamoDbClient();
-    var dynamodbStreamsClient = appConfig.dynamoDbStreamsClient();
+    var dynamodbClient = dynamoDbConfig.dynamoDbClient();
+    var dynamodbStreamsClient = dynamoDbConfig.dynamoDbStreamsClient();
 
     while (true) {
       try {

@@ -11,7 +11,11 @@ FROM --platform=${BUILDPLATFORM} eclipse-temurin:17.0.10_7-jdk
 
 VOLUME /tmp
 ARG DEPENDENCY=/workspace/app/bootstrap/build/dependency
-COPY --from=build ${DEPENDENCY}/BOOT-INF/classes /app
 COPY --from=build ${DEPENDENCY}/BOOT-INF/lib /app/lib
 COPY --from=build ${DEPENDENCY}/META-INF /app/META-INF
-ENTRYPOINT ["java","-cp","app:app/lib/*","com.github.j5ik2o.crs.es.java.main.Main"]
+COPY --from=build ${DEPENDENCY}/BOOT-INF/classes /app
+WORKDIR /app
+
+COPY boot.sh /app
+
+ENTRYPOINT ["./boot.sh"]

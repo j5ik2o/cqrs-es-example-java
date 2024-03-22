@@ -2,6 +2,7 @@
 #
 # https://gqlgen.com/getting-started/
 
+scalar LocalDateTime
 
 """
 グループチャットリードモデル
@@ -25,11 +26,11 @@ type GroupChatOutput {
 	"""
 	作成日時
 	"""
-	createdAt: NaiveDateTime!
+	createdAt: LocalDateTime!
 	"""
 	更新日時
   """
-  updatedAt: NaiveDateTime!
+  updatedAt: LocalDateTime!
 }
 
 
@@ -57,11 +58,11 @@ type MemberOutput {
 	"""
 	作成日時
 	"""
-	createdAt: NaiveDateTime!
+	createdAt: LocalDateTime!
 	"""
 	更新日時
   """
-  updatedAt: NaiveDateTime!
+  updatedAt: LocalDateTime!
 }
 
 """
@@ -87,21 +88,12 @@ type MessageOutput {
 	"""
 	作成日時
 	"""
-	createdAt: NaiveDateTime!
+	createdAt: LocalDateTime!
 	"""
 	更新日時
   """
-  updatedAt: NaiveDateTime!
+  updatedAt: LocalDateTime!
 }
-
-"""
-ISO 8601 combined date and time without timezone.
-
-# Examples
-
-* `2015-07-01T08:59:60.123`,
-"""
-scalar NaiveDateTime
 
 type Query {
 	"""
