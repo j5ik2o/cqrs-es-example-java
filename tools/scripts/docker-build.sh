@@ -35,6 +35,7 @@ if [ "$ARCH" == "arm64" ] || [ "$ARCH" == "aarch64" ] || [ "$IS_ALL" -eq 1 ]; th
 docker buildx build --builder amd-arm --platform linux/arm/v7 \
   --build-context eclipse-temurin:17-jdk=docker-image://arm32v7/eclipse-temurin:17-jdk \
   -t $LOCAL_ARM64_URI --load -f Dockerfile . &
+PIDS+=($!)
 
 fi
 
@@ -48,7 +49,7 @@ PIDS+=($!)
 fi
 
 for PID in "${PIDS[@]}"; do
-    wait "$PID"
+    wait "${PID}"
 done
 
 popd

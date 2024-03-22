@@ -208,6 +208,7 @@ project(":query:interface-adaptor") {
         testImplementation("org.mybatis.spring.boot:mybatis-spring-boot-starter-test:3.0.3")
         testImplementation("org.flywaydb:flyway-core:10.10.0")
         testImplementation("org.flywaydb:flyway-mysql:10.10.0")
+        implementation("com.tailrocks.graphql:graphql-datetime-spring-boot-starter:6.0.0")
     }
 
     tasks.named<GraphQLCodegenGradleTask>("graphqlCodegen") {
