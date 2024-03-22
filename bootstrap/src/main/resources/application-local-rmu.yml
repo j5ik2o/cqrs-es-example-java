@@ -1,5 +1,3 @@
 spring:
   config:
     import: classpath:application-common.yml
-  main:
-    web-application-type: none

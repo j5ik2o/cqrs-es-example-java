@@ -42,8 +42,8 @@ public class QueryResolverImpl implements QueryResolver {
                         groupChatRecord.id(),
                         groupChatRecord.name(),
                         groupChatRecord.ownerId(),
-                        groupChatRecord.createdAt().toString(),
-                        groupChatRecord.updatedAt().toString())));
+                        groupChatRecord.createdAt(),
+                        groupChatRecord.updatedAt())));
   }
 
   @QueryMapping
@@ -58,8 +58,8 @@ public class QueryResolverImpl implements QueryResolver {
                         groupChatRecord.id(),
                         groupChatRecord.name(),
                         groupChatRecord.ownerId(),
-                        groupChatRecord.createdAt().toString(),
-                        groupChatRecord.updatedAt().toString()))
+                        groupChatRecord.createdAt(),
+                        groupChatRecord.updatedAt()))
             .toArray(GroupChatOutput[]::new));
   }
 
@@ -78,8 +78,8 @@ public class QueryResolverImpl implements QueryResolver {
                         memberRecord.groupChatId(),
                         memberRecord.userAccountId(),
                         memberRecord.role(),
-                        memberRecord.createdAt().toString(),
-                        memberRecord.updatedAt().toString())));
+                        memberRecord.createdAt(),
+                        memberRecord.updatedAt())));
   }
 
   @QueryMapping
@@ -96,8 +96,8 @@ public class QueryResolverImpl implements QueryResolver {
                         memberRecord.groupChatId(),
                         memberRecord.userAccountId(),
                         memberRecord.role(),
-                        memberRecord.createdAt().toString(),
-                        memberRecord.updatedAt().toString()))
+                        memberRecord.createdAt(),
+                        memberRecord.updatedAt()))
             .toArray(MemberOutput[]::new));
   }
 
@@ -116,8 +116,8 @@ public class QueryResolverImpl implements QueryResolver {
                         messageRecord.groupChatId(),
                         messageRecord.senderId(),
                         messageRecord.content(),
-                        messageRecord.createdAt().toString(),
-                        messageRecord.updatedAt().toString())));
+                        messageRecord.createdAt(),
+                        messageRecord.updatedAt())));
   }
 
   @QueryMapping
@@ -134,8 +134,8 @@ public class QueryResolverImpl implements QueryResolver {
                         messageRecord.groupChatId(),
                         messageRecord.senderId(),
                         messageRecord.content(),
-                        messageRecord.createdAt().toString(),
-                        messageRecord.updatedAt().toString()))
+                        messageRecord.createdAt(),
+                        messageRecord.updatedAt()))
             .toArray(MessageOutput[]::new));
   }
 }
