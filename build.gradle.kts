@@ -141,7 +141,7 @@ project(":command:interface-adaptor-impl") {
         testImplementation("org.springframework.boot:spring-boot-starter-test")
 
         implementation("org.springframework.boot:spring-boot-starter-graphql")
-        implementation("com.graphql-java:graphql-java:21.4")
+        implementation("com.graphql-java:graphql-java:21.5")
 
         testImplementation("org.springframework:spring-webflux")
         implementation("mysql:mysql-connector-java:8.0.33")
@@ -203,7 +203,7 @@ project(":query:interface-adaptor") {
         implementation("javax.validation:validation-api:2.0.1.Final")
         implementation("org.springframework:spring-context")
         implementation("org.springframework.boot:spring-boot-starter-graphql")
-        implementation("com.graphql-java:graphql-java:21.4")
+        implementation("com.graphql-java:graphql-java:21.5")
         implementation("org.mybatis.spring.boot:mybatis-spring-boot-starter:3.0.3")
         testImplementation("org.mybatis.spring.boot:mybatis-spring-boot-starter-test:3.0.3")
         testImplementation("org.flywaydb:flyway-core:10.10.0")
