@@ -192,6 +192,7 @@ project(":command:processor") {
         implementation(project(":command:interface-adaptor-if"))
         implementation("org.springframework:spring-context")
         implementation("com.github.j5ik2o:event-store-adapter-java:1.1.123")
+        implementation("com.fasterxml.jackson.core:jackson-annotations:2.17.0")
     }
 }
 

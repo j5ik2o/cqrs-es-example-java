@@ -6,7 +6,6 @@ import lombok.Setter;
 import lombok.ToString;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
-import org.springframework.context.annotation.Profile;
 import software.amazon.awssdk.auth.credentials.AwsBasicCredentials;
 import software.amazon.awssdk.auth.credentials.StaticCredentialsProvider;
 import software.amazon.awssdk.services.dynamodb.DynamoDbAsyncClient;
@@ -14,14 +13,17 @@ import software.amazon.awssdk.services.dynamodb.DynamoDbClient;
 import software.amazon.awssdk.services.dynamodb.streams.DynamoDbStreamsAsyncClient;
 import software.amazon.awssdk.services.dynamodb.streams.DynamoDbStreamsClient;
 
+@Configuration
 @Getter
 @Setter
 @ToString
-@Configuration
-@Profile("write")
 public class DynamoDbConfig {
 
-  private AppConfig appConfig;
+  private final AppConfig appConfig;
+
+  public DynamoDbConfig(AppConfig appConfig) {
+    this.appConfig = appConfig;
+  }
 
   @Bean
   public DynamoDbClient dynamoDbClient() {

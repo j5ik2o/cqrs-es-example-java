@@ -9,6 +9,7 @@ import com.github.j5ik2o.event.store.adapter.java.EventStoreAsync;
 import io.vavr.control.Option;
 import java.net.URI;
 import java.util.function.BiPredicate;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -54,7 +55,7 @@ public class RepositoryConfig {
         && dynamodbSecretAccessKey != null;
   }
 
-  @Bean
+  @Bean(name = "dynamoDbAsyncClient2")
   public DynamoDbAsyncClient dynamoDbAsyncClient() {
     if (hasDynamoDbConfig()) {
       return DynamoDbAsyncClient.builder()
@@ -75,9 +76,9 @@ public class RepositoryConfig {
 
   @Bean
   public EventStoreAsync<GroupChatId, GroupChat, GroupChatEvent> eventStoreAsync(
-      DynamoDbAsyncClient dynamoDbAsyncClient) {
+      @Qualifier("dynamoDbAsyncClient2") DynamoDbAsyncClient dynamoDbAsyncClient2) {
     return EventStoreAsync.<GroupChatId, GroupChat, GroupChatEvent>ofDynamoDB(
-            dynamoDbAsyncClient,
+            dynamoDbAsyncClient2,
             journalTableName,
             snapshotTableName,
             journalAidIndexName,
