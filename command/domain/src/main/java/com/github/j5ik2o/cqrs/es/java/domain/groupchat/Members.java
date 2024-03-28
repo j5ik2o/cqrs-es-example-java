@@ -39,7 +39,8 @@ public final class Members {
     return values.exists(
         member ->
             member.getUserAccountId().equals(userAccountId)
-                && (member.getRole() == MemberRole.MEMBER || member.getRole() == MemberRole.ADMINISTRATOR));
+                && (member.getRole() == MemberRole.MEMBER
+                    || member.getRole() == MemberRole.ADMINISTRATOR));
   }
 
   @JsonProperty(access = JsonProperty.Access.READ_ONLY)

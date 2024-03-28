@@ -36,8 +36,7 @@ public class ReadModelUpdater {
                 byte[] bytes = new byte[payloadBytes.remaining()];
                 payloadBytes.get(bytes);
 
-                GroupChatEvent groupChatEvent =
-                    serializer.deserialize(bytes, GroupChatEvent.class);
+                GroupChatEvent groupChatEvent = serializer.deserialize(bytes, GroupChatEvent.class);
                 if (groupChatEvent instanceof GroupChatEvent.Created typedEvent) {
                   insertGroupChat(typedEvent);
                 } else if (groupChatEvent instanceof GroupChatEvent.Deleted typedEvent) {

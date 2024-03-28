@@ -1,11 +1,10 @@
 package com.github.j5ik2o.cqrs.es.java.rmu.dao;
 
+import java.time.Instant;
 import org.apache.ibatis.annotations.Flush;
 import org.apache.ibatis.annotations.Insert;
 import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Update;
-
-import java.time.Instant;
 
 @Mapper
 public interface GroupChatWriteMapper {
