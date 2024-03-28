@@ -20,10 +20,10 @@ Please refer to [here](https://github.com/j5ik2o/cqrs-es-example) for implementa
 
 ## Feature
 
-- [ ] Write API Server(GraphQL)
-- [ ] Read API Server(GraphQL)
-- [ ] Read Model Updater on Local
-- [ ] Docker Compose Support
+- [x] Write API Server(GraphQL)
+- [x] Read API Server(GraphQL)
+- [x] Read Model Updater on Local
+- [x] Docker Compose Support
 - [ ] Read Model Updater on AWS Lambda
 - [ ] Deployment to AWS
 
