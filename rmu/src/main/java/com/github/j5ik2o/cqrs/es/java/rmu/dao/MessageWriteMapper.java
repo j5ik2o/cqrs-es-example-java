@@ -8,7 +8,7 @@ import org.apache.ibatis.annotations.Update;
 @Mapper
 public interface MessageWriteMapper {
   @Insert(
-      "INSERT INTO messages (id, disabled, group_chat_id, content, sender_id, created_at, updated_at) VALUES(#{id}, 0, #{groupChatId}, #{content}, #{senderId}, #{createdAt}, #{updatedAt})")
+      "INSERT INTO messages (id, disabled, group_chat_id, text, user_account_id, created_at, updated_at) VALUES(#{id}, 0, #{groupChatId}, #{content}, #{senderId}, #{createdAt}, #{updatedAt})")
   @Flush
   int insertMessage(MessageRecord messageRecord);
 

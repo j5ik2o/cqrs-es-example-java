@@ -5,14 +5,12 @@ import lombok.Setter;
 import lombok.ToString;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.context.annotation.Configuration;
-import org.springframework.context.annotation.Profile;
 
 @Configuration
 @ConfigurationProperties(prefix = "app")
 @Getter
 @Setter
 @ToString
-@Profile({"write", "read", "local-rmu"})
 public class AppConfig {
 
   private DynamoDb dynamoDb;

@@ -210,7 +210,7 @@ public final class GroupChat implements Aggregate<GroupChat, GroupChatId> {
     if (deleted) {
       return Either.left(new GroupChatError.AlreadyDeletedError(id));
     }
-    if (!members.isAdministrator(executorId)) {
+    if (!members.isMember(executorId)) {
       return Either.left(new GroupChatError.NotAdministratorError(id, executorId));
     }
     if (!messages.containsByMessageId(messageId)) {

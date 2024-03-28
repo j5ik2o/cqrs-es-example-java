@@ -5,13 +5,11 @@ services:
     image: cqrs-es-example-java:latest-${ARCH}
     container_name: write-api-server-java-1
     ports:
-      - 18080:8080
+      - 58080:8080
     environment:
       AWS_REGION: ap-northeast-1
-      RUST_LOG: debug
-      RUST_BACKTRACE: full
-      APP_API_HOST: "0.0.0.0"
-      APP_API_PORT: 8080
+      SERVER_ADDRESS: "0.0.0.0"
+      SERVER_PORT: 8080
       APP_API_ALLOW_ORIGINS: "http://localhost:18080,http://localhost:18082,http://localhost:8888"
       APP_PERSISTENCE_JOURNAL_TABLE_NAME: journal
       APP_PERSISTENCE_JOURNAL_AID_INDEX_NAME: journal-aid-index
@@ -19,10 +17,10 @@ services:
       APP_PERSISTENCE_SNAPSHOT_AID_INDEX_NAME: snapshot-aid-index
       APP_PERSISTENCE_SHARD_COUNT: 64
       APP_PERSISTENCE_SNAPSHOT_INTERVAL: 10
-      APP_DYNAMODB_REGION_NAME: ${AWS_REGION}
-      APP_DYNAMODB_ENDPOINT_URL: http://localstack:4566
-      APP_DYNAMODB_ACCESS_KEY_ID: x
-      APP_DYNAMODB_SECRET_ACCESS_KEY: x
+      APP_DYNAMO_DB_REGION_NAME: ${AWS_REGION}
+      APP_DYNAMO_DB_ENDPOINT_URL: http://localstack:4566
+      APP_DYNAMO_DB_ACCESS_KEY_ID: x
+      APP_DYNAMO_DB_SECRET_ACCESS_KEY: x
     depends_on:
       - localstack
       - dynamodb-admin
@@ -32,17 +30,15 @@ services:
     image: cqrs-es-example-java:latest-${ARCH}
     container_name: read-model-updater-java-1
     ports:
-      - 18081:8080
+      - 58081:8080
     environment:
       AWS_REGION: ap-northeast-1
-      RUST_LOG: debug
-      RUST_BACKTRACE: full
-      APP_API_HOST: "0.0.0.0"
-      APP_API_PORT: 8080
-      APP_DYNAMODB_REGION_NAME: ${AWS_REGION}
-      APP_DYNAMODB_ENDPOINT_URL: http://localstack:4566
-      APP_DYNAMODB_ACCESS_KEY_ID: x
-      APP_DYNAMODB_SECRET_ACCESS_KEY: x
+      SERVER_ADDRESS: "0.0.0.0"
+      SERVER_PORT: 8080
+      APP_DYNAMO_DB_REGION_NAME: ${AWS_REGION}
+      APP_DYNAMO_DB_ENDPOINT_URL: http://localstack:4566
+      APP_DYNAMO_DB_ACCESS_KEY_ID: x
+      APP_DYNAMO_DB_SECRET_ACCESS_KEY: x
       APP_STREAM_JOURNAL_TABLE_NAME: journal
       APP_STREAM_MAX_ITEM_COUNT: 32
       SPRING_DATASOURCE_URL: jdbc:mysql://mysql-local:3306/ceer
@@ -57,13 +53,11 @@ services:
     image: cqrs-es-example-java:latest-${ARCH}
     container_name: read-api-server-java-1
     ports:
-      - 18082:8080
+      - 58082:8080
     environment:
       AWS_REGION: ap-northeast-1
-      RUST_LOG: debug
-      RUST_BACKTRACE: full
-      APP_API_HOST: "0.0.0.0"
-      APP_API_PORT: 8080
+      SERVER_ADDRESS: "0.0.0.0"
+      SERVER_PORT: 8080
       APP_API_ALLOW_ORIGINS: "http://localhost:18080,http://localhost:18082,http://localhost:8888"
       SPRING_DATASOURCE_URL: jdbc:mysql://mysql-local:3306/ceer
       SPRING_DATASOURCE_USERNAME: ceer

@@ -61,6 +61,9 @@ public final class UserAccountId implements AggregateId {
   }
 
   public static UserAccountId ofString(String value) {
+    if (value == null || value.isEmpty()) {
+      throw new IllegalArgumentException("userAccountId is empty");
+    }
     if (value.startsWith(TYPE_NAME + "-")) {
       value = value.substring((TYPE_NAME + "-").length());
     }

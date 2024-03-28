@@ -32,8 +32,8 @@ PIDS=()
 
 if [ "$ARCH" == "arm64" ] || [ "$ARCH" == "aarch64" ] || [ "$IS_ALL" -eq 1 ]; then
 
-docker buildx build --builder amd-arm --platform linux/arm/v7 \
-  --build-context eclipse-temurin:17-jdk=docker-image://arm32v7/eclipse-temurin:17-jdk \
+docker buildx build --builder amd-arm --platform linux/arm64/v8 \
+  --build-context amazoncorretto:17=docker-image://amazoncorretto:17 \
   -t $LOCAL_ARM64_URI --load -f Dockerfile . &
 PIDS+=($!)
 
@@ -42,7 +42,7 @@ fi
 if [ "$ARCH" == "x86_64" ] || [ "$IS_ALL" -eq 1 ]; then
 
 docker buildx build --builder amd-arm --platform linux/amd64 \
-  --build-context eclipse-temurin:17-jdk=docker-image://eclipse-temurin:17-jdk \
+  --build-context amazoncorretto:17=docker-image://amazoncorretto:17 \
   -t $LOCAL_AMD64_URI --load -f Dockerfile . &
 PIDS+=($!)
 
