@@ -4,6 +4,7 @@ import com.amazonaws.services.lambda.runtime.events.DynamodbEvent;
 import com.github.j5ik2o.cqrs.es.java.command.interface_adaptor.repository.serialization.GroupChatEventSerializer;
 import com.github.j5ik2o.cqrs.es.java.domain.groupchat.GroupChatEvent;
 import com.github.j5ik2o.cqrs.es.java.domain.groupchat.MemberId;
+import com.github.j5ik2o.cqrs.es.java.domain.groupchat.MemberRole;
 import com.github.j5ik2o.cqrs.es.java.rmu.dao.*;
 import com.github.j5ik2o.event.store.adapter.java.DeserializationException;
 import java.nio.ByteBuffer;
@@ -32,8 +33,11 @@ public class ReadModelUpdater {
             record -> {
               var payloadBytes = getByteBuffer(record);
               try {
+                byte[] bytes = new byte[payloadBytes.remaining()];
+                payloadBytes.get(bytes);
+
                 GroupChatEvent groupChatEvent =
-                    serializer.deserialize(payloadBytes.array(), GroupChatEvent.class);
+                    serializer.deserialize(bytes, GroupChatEvent.class);
                 if (groupChatEvent instanceof GroupChatEvent.Created typedEvent) {
                   insertGroupChat(typedEvent);
                 } else if (groupChatEvent instanceof GroupChatEvent.Deleted typedEvent) {
@@ -65,7 +69,7 @@ public class ReadModelUpdater {
       throw new IllegalStateException("attributeValues is null");
     }
     var payloadAttr = attributeValues.get("payload");
-    if (payloadAttr == null || payloadAttr.isNULL()) {
+    if (payloadAttr == null || payloadAttr.isNULL() != null && payloadAttr.isNULL()) {
       throw new IllegalStateException("Payload is missing or not a binary type");
     }
     return payloadAttr.getB();
@@ -85,12 +89,12 @@ public class ReadModelUpdater {
   }
 
   private void insertMember(GroupChatEvent.MemberAdded typedEvent) {
-    var memberId = MemberId.generate();
     var memberRecord =
         new MemberRecord(
-            memberId.asString(),
+            typedEvent.member().getId().asString(),
             typedEvent.aggregateId().asString(),
-            typedEvent.executorId().asString(),
+            typedEvent.member().getUserAccountId().asString(),
+            typedEvent.member().getRole().name(),
             typedEvent.occurredAt(),
             typedEvent.occurredAt());
     memberWriteMapper.insertMember(memberRecord);
@@ -99,7 +103,7 @@ public class ReadModelUpdater {
   private void insertMessage(GroupChatEvent.MessagePosted typedEvent) {
     var messageRecord =
         new MessageRecord(
-            typedEvent.getId(),
+            typedEvent.message().getId().asString(),
             typedEvent.aggregateId().asString(),
             typedEvent.message().getContent(),
             typedEvent.message().getSenderId().asString(),
@@ -110,7 +114,7 @@ public class ReadModelUpdater {
 
   private void renameGroupChat(GroupChatEvent.Renamed typedEvent) {
     groupChatWriteMapper.updateGroupChatName(
-        typedEvent.aggregateId().asString(), typedEvent.name().asString());
+        typedEvent.aggregateId().asString(), typedEvent.name().asString(), typedEvent.occurredAt());
   }
 
   private void insertGroupChat(GroupChatEvent.Created typedEvent) {
@@ -128,6 +132,7 @@ public class ReadModelUpdater {
             memberId.asString(),
             typedEvent.aggregateId().asString(),
             typedEvent.executorId().asString(),
+            MemberRole.ADMINISTRATOR.name(),
             typedEvent.occurredAt(),
             typedEvent.occurredAt());
     memberWriteMapper.insertMember(memberRecord);

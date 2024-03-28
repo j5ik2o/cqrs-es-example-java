@@ -76,7 +76,7 @@ public class MutationResolverImpl implements MutationResolver {
     Mono<UserAccountId> userAccountIdMono =
         UserAccountId.validate(input.getUserAccountId()).fold(Mono::error, Mono::just);
     Mono<MemberRole> memberRoleMono =
-        MemberRole.validate(input.getRole().name().toLowerCase()).fold(Mono::error, Mono::just);
+        MemberRole.validate(input.getRole().name()).fold(Mono::error, Mono::just);
     Mono<UserAccountId> executorIdMono =
         UserAccountId.validate(input.getExecutorId()).fold(Mono::error, Mono::just);
     Mono<Member> memberMono =

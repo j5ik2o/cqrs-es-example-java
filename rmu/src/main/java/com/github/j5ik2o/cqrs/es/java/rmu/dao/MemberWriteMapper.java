@@ -5,7 +5,7 @@ import org.apache.ibatis.annotations.*;
 @Mapper
 public interface MemberWriteMapper {
   @Insert(
-      "INSERT INTO members (id, group_chat_id, user_account_id, created_at, updated_at) VALUES(#{id}, #{groupChatId}, #{userAccountId}, #{createdAt}, #{updatedAt})")
+      "INSERT INTO members (id, group_chat_id, user_account_id, role, created_at, updated_at) VALUES(#{id}, #{groupChatId}, #{userAccountId}, #{role}, #{createdAt}, #{updatedAt})")
   @Flush
   int insertMember(MemberRecord memberRecord);
 

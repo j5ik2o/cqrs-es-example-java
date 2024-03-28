@@ -50,8 +50,8 @@ public class LocalRMUMain implements CommandLineRunner {
         LOGGER.warn(
             "An error has occurred, but stream processing is restarted. If this error persists, the read model condition may be incorrect.",
             ex);
-        Thread.sleep(1000L);
       }
+      Thread.sleep(1000L);
     }
   }
 
@@ -134,6 +134,8 @@ public class LocalRMUMain implements CommandLineRunner {
       var describeStreamResponse = dynamodbStreamsClient.describeStream(builder.build());
       var shards = describeStreamResponse.streamDescription().shards();
 
+      LOGGER.info("shards = {}", shards.stream().map(Shard::shardId).toList());
+
       for (var shard : shards) {
         var shardId = shard.shardId();
         var getShardIteratorResponse =
@@ -150,6 +152,11 @@ public class LocalRMUMain implements CommandLineRunner {
               dynamodbStreamsClient.getRecords(
                   GetRecordsRequest.builder().shardIterator(shardIterator).limit(100).build());
           var records = getRecordsResponse.records();
+
+          if (!records.isEmpty()) {
+            LOGGER.info("records = {}", records.stream().map(Record::eventID).toList());
+          }
+
           for (var record : records) {
             var keys = getKeys(record);
             var item = getItem(record);

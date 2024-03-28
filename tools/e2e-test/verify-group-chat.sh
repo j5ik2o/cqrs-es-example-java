@@ -31,8 +31,6 @@ fi
 
 echo "Result: $CREATE_GROUP_CHAT_RESULT"
 
-exit
-
 GROUP_CHAT_ID=$(echo $CREATE_GROUP_CHAT_RESULT | jq -r .data.createGroupChat.groupChatId)
 
 # メンバー追加
@@ -231,35 +229,35 @@ echo "Result: $GET_MESSAGES_RESULT"
 
 
 # メッセージ編集
-echo -e "\nEdit Message(${GROUP_CHAT_ID}, ${USER_ACCOUNT_ID}):"
-EDIT_MESSAGE_RESULT=$(curl -s -X POST -H "Content-Type: application/json" \
-	${WRITE_API_SERVER_BASE_URL}/query \
-	-d @- <<EOS
-{
-  "query": "mutation EditMessage(\$input: EditMessageInput!) { editMessage(input: \$input) { groupChatId } }",
-  "variables": {
-    "input": {
-      "groupChatId": "${GROUP_CHAT_ID}",
-      "messageId": "${MESSAGE_ID}",
-      "content": "Text2",
-      "executorId": "${USER_ACCOUNT_ID}"
-    }
-  }
-}
-EOS
-)
+#echo -e "\nEdit Message(${GROUP_CHAT_ID}, ${USER_ACCOUNT_ID}):"
+#EDIT_MESSAGE_RESULT=$(curl -s -X POST -H "Content-Type: application/json" \
+#	${WRITE_API_SERVER_BASE_URL} \
+#	-d @- <<EOS
+#{
+#  "query": "mutation EditMessage(\$input: EditMessageInput!) { editMessage(input: \$input) { groupChatId } }",
+#  "variables": {
+#    "input": {
+#      "groupChatId": "${GROUP_CHAT_ID}",
+#      "messageId": "${MESSAGE_ID}",
+#      "content": "Text2",
+#      "executorId": "${USER_ACCOUNT_ID}"
+#    }
+#  }
+#}
+#EOS
+#)
 
-if echo $EDIT_MESSAGE_RESULT | jq -e .errors > /dev/null; then
-  echo "Error: $EDIT_MESSAGE_RESULT"
-  exit 1
-fi
+#if echo $EDIT_MESSAGE_RESULT | jq -e .errors > /dev/null; then
+#  echo "Error: $EDIT_MESSAGE_RESULT"
+#  exit 1
+#fi
 
-echo "Result: $EDIT_MESSAGE_RESULT"
+#echo "Result: $EDIT_MESSAGE_RESULT"
 
 # メッセージの削除
 echo -e "\nDelete Message(${GROUP_CHAT_ID}, ${MESSAGE_ID}, ${USER_ACCOUNT_ID}):"
 DELETE_MESSAGE_RESULT=$(curl -s -X POST -H "Content-Type: application/json" \
-	${WRITE_API_SERVER_BASE_URL}/query \
+	${WRITE_API_SERVER_BASE_URL} \
 	-d @- <<EOS
 {
   "query": "mutation DeleteMessage(\$input: DeleteMessageInput!) { deleteMessage(input: \$input) { groupChatId } }",
@@ -284,7 +282,7 @@ echo "Result: $DELETE_MESSAGE_RESULT"
 # メンバーの削除
 echo -e "\nRemove Member(${GROUP_CHAT_ID}, ${USER_ACCOUNT_ID}, ${ADMIN_ID}):"
 REMOVE_MEMBER_RESULT=$(curl -s -X POST -H "Content-Type: application/json" \
-	${WRITE_API_SERVER_BASE_URL}/query \
+	${WRITE_API_SERVER_BASE_URL} \
 	-d @- <<EOS
 {
   "query": "mutation RemoveMember(\$input: RemoveMemberInput!) { removeMember(input: \$input) { groupChatId } }",
@@ -309,7 +307,7 @@ echo "Result: $REMOVE_MEMBER_RESULT"
 # ルームの削除
 echo -e "\nDelete GroupChat(${GROUP_CHAT_ID}, ${ADMIN_ID}):"
 DELETE_GROUP_CHAT_RESULT=$(curl -s -X POST -H "Content-Type: application/json" \
-	${WRITE_API_SERVER_BASE_URL}/query \
+	${WRITE_API_SERVER_BASE_URL} \
 	-d @- <<EOS
 {
   "query": "mutation DeleteGroupChat(\$input: DeleteGroupChatInput!) { deleteGroupChat(input: \$input) { groupChatId } }",
