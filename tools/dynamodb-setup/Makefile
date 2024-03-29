@@ -1,19 +1,7 @@
 # aws-cli/2.0.4 Python/3.8.2 Darwin/19.3.0 botocore/2.0.0dev8
 
-# import config.
-# You can change the default config with `make cnf="config_special.env" build`
-cnf ?= config.env
-include $(cnf)
-export $(shell sed 's/=.*//' $(cnf))
-
-# import deploy config
-# You can change the default deploy config with `make cnf="deploy_special.env" release`
-#dpl ?= deploy.env
-#include $(dpl)
-#export $(shell sed 's/=.*//' $(dpl))
-
-# grep the version from the mix file
-VERSION=$(shell ./version.sh)
+APP_NAME=dynamodb-setup-java
+VERSION=1.0.0
 
 # HELP
 # This will output the help for each task
@@ -34,7 +22,7 @@ build: ## Build the container
 build-nc: ## Build the container without caching
 	docker build --no-cache -t $(APP_NAME) .
 
-build-x: ## Build
+build-x: ## Build for buildx
 	@echo 'buildx $(APP_NAME)'
 	docker buildx build --platform=linux/amd64 --load -t $(APP_NAME) .
 
