@@ -19,6 +19,22 @@ tasks.getByName<Jar>("jar") {
     enabled = false
 }
 
+tasks.register<Exec>("docker-build") {
+    commandLine("./tools/scripts/docker-build.sh")
+}
+
+tasks.register<Exec>("docker-compose-up") {
+    commandLine("./tools/scripts/docker-compose-up.sh")
+}
+
+tasks.named<Exec>("docker-compose-up") {
+    dependsOn("docker-build")
+}
+
+tasks.register<Exec>("docker-compose-down") {
+    commandLine("./tools/scripts/docker-compose-down.sh")
+}
+
 allprojects {
     apply(plugin = "com.diffplug.spotless")
 
