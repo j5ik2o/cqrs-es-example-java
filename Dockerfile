@@ -7,7 +7,7 @@ COPY . /workspace/app
 RUN --mount=type=cache,target=/root/.gradle ./gradlew clean :bootstrap:build --no-daemon
 RUN mkdir -p bootstrap/build/dependency && (cd bootstrap/build/dependency; jar -xf ../libs/*-SNAPSHOT.jar)
 
-FROM --platform=${BUILDPLATFORM} amazoncorretto:17.0.11
+FROM --platform=${BUILDPLATFORM} amazoncorretto:21.0.3
 
 VOLUME /tmp
 ARG DEPENDENCY=/workspace/app/bootstrap/build/dependency
