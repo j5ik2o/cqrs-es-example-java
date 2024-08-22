@@ -10,7 +10,7 @@
 
 Status: In Implementation
 
-This is an example of CQRS/Event Sourcing and GraphQL implemented in Java.
+This is an example of CQRS/Event Sourcing and GraphQL implemented in Java. This example is class-based, not actor-model based.
 
 This project uses [j5ik2o/event-store-adapter-java](https://github.com/j5ik2o/event-store-adapter-java) for Event Sourcing.
 
