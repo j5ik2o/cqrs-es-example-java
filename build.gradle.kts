@@ -80,7 +80,7 @@ subprojects {
         implementation("org.projectlombok:lombok:1.18.34")
         testImplementation("org.junit.jupiter:junit-jupiter-api:5.11.2")
         testRuntimeOnly("org.junit.jupiter:junit-jupiter-engine:5.11.2")
-        implementation("io.vavr:vavr:0.10.4")
+        implementation("io.vavr:vavr:0.10.5")
 
         testImplementation("org.springframework.boot:spring-boot-testcontainers")
         testImplementation("org.testcontainers:junit-jupiter")
