@@ -167,7 +167,7 @@ project(":command:interface-adaptor-impl") {
         implementation("mysql:mysql-connector-java:8.0.33")
 
         testImplementation("org.testcontainers:localstack:1.20.4")
-        testImplementation("org.testcontainers:mysql:1.20.3")
+        testImplementation("org.testcontainers:mysql:1.20.4")
 
         implementation("software.amazon.awssdk:dynamodb:2.29.18")
         implementation("javax.validation:validation-api:2.0.1.Final")
