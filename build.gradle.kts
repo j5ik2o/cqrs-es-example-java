@@ -225,7 +225,7 @@ project(":query:interface-adaptor") {
         implementation("org.springframework:spring-context")
         implementation("org.springframework.boot:spring-boot-starter-graphql")
         implementation("com.graphql-java:graphql-java:230521-nf-execution")
-        implementation("org.mybatis.spring.boot:mybatis-spring-boot-starter:3.0.3")
+        implementation("org.mybatis.spring.boot:mybatis-spring-boot-starter:3.0.4")
         testImplementation("org.mybatis.spring.boot:mybatis-spring-boot-starter-test:3.0.3")
         testImplementation("org.flywaydb:flyway-core:10.22.0")
         testImplementation("org.flywaydb:flyway-mysql:10.22.0")
@@ -268,7 +268,7 @@ project(":rmu") {
         implementation(project(":command:interface-adaptor-impl"))
         implementation(project(":command:domain"))
 
-        implementation("org.mybatis.spring.boot:mybatis-spring-boot-starter:3.0.3")
+        implementation("org.mybatis.spring.boot:mybatis-spring-boot-starter:3.0.4")
         testImplementation("org.mybatis.spring.boot:mybatis-spring-boot-starter-test:3.0.3")
 
         testImplementation("org.flywaydb:flyway-core:10.22.0")
@@ -304,7 +304,7 @@ project(":bootstrap") {
         implementation("software.amazon.awssdk:dynamodb:2.29.22")
         implementation("com.amazonaws:aws-lambda-java-events:3.14.0")
         implementation("org.springframework.boot:spring-boot-configuration-processor")
-        implementation("org.mybatis.spring.boot:mybatis-spring-boot-starter:3.0.3")
+        implementation("org.mybatis.spring.boot:mybatis-spring-boot-starter:3.0.4")
     }
     jib {
         to {
