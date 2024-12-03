@@ -169,7 +169,7 @@ project(":command:interface-adaptor-impl") {
         testImplementation("org.testcontainers:localstack:1.20.4")
         testImplementation("org.testcontainers:mysql:1.20.4")
 
-        implementation("software.amazon.awssdk:dynamodb:2.29.24")
+        implementation("software.amazon.awssdk:dynamodb:2.29.25")
         implementation("javax.validation:validation-api:2.0.1.Final")
 
         implementation("io.projectreactor:reactor-core:3.7.0")
@@ -301,7 +301,7 @@ project(":bootstrap") {
         implementation(project(":query:interface-adaptor"))
         implementation(project(":rmu"))
         implementation("com.github.j5ik2o:event-store-adapter-java:1.1.174")
-        implementation("software.amazon.awssdk:dynamodb:2.29.24")
+        implementation("software.amazon.awssdk:dynamodb:2.29.25")
         implementation("com.amazonaws:aws-lambda-java-events:3.14.0")
         implementation("org.springframework.boot:spring-boot-configuration-processor")
         implementation("org.mybatis.spring.boot:mybatis-spring-boot-starter:3.0.4")
