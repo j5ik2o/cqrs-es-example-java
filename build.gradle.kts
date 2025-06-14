@@ -132,8 +132,8 @@ project(":command:domain") {
         implementation("com.github.j5ik2o:event-store-adapter-java:1.1.174")
         implementation(project(":infrastructure"))
         implementation("com.github.f4b6a3:ulid-creator:5.2.3")
-        implementation("com.fasterxml.jackson.core:jackson-databind:2.19.0")
-        implementation("com.fasterxml.jackson.core:jackson-annotations:2.19.0")
+        implementation("com.fasterxml.jackson.core:jackson-databind:2.19.1")
+        implementation("com.fasterxml.jackson.core:jackson-annotations:2.19.1")
         implementation("com.fasterxml.jackson.datatype:jackson-datatype-jsr310:2.19.1")
     }
 }
@@ -142,7 +142,7 @@ project(":command:interface-adaptor-if") {
     dependencies {
         implementation(project(":infrastructure"))
         implementation(project(":command:domain"))
-        implementation("com.fasterxml.jackson.core:jackson-annotations:2.19.0")
+        implementation("com.fasterxml.jackson.core:jackson-annotations:2.19.1")
         implementation("com.fasterxml.jackson.datatype:jackson-datatype-jsr310:2.19.1")
     }
 }
@@ -212,7 +212,7 @@ project(":command:processor") {
         implementation(project(":command:interface-adaptor-if"))
         implementation("org.springframework:spring-context")
         implementation("com.github.j5ik2o:event-store-adapter-java:1.1.174")
-        implementation("com.fasterxml.jackson.core:jackson-annotations:2.19.0")
+        implementation("com.fasterxml.jackson.core:jackson-annotations:2.19.1")
     }
 }
 
@@ -278,8 +278,8 @@ project(":rmu") {
         implementation("com.amazonaws:aws-lambda-java-core:1.3.0")
         implementation("com.github.j5ik2o:event-store-adapter-java:1.1.174")
 
-        implementation("com.fasterxml.jackson.core:jackson-databind:2.19.0")
-        implementation("com.fasterxml.jackson.core:jackson-annotations:2.19.0")
+        implementation("com.fasterxml.jackson.core:jackson-databind:2.19.1")
+        implementation("com.fasterxml.jackson.core:jackson-annotations:2.19.1")
         implementation("com.fasterxml.jackson.datatype:jackson-datatype-jsr310:2.19.1")
     }
 }
