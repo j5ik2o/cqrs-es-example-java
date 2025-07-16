@@ -274,7 +274,7 @@ project(":rmu") {
         testImplementation("org.flywaydb:flyway-core:11.10.2")
         testImplementation("org.flywaydb:flyway-mysql:11.10.2")
 
-        implementation("com.amazonaws:aws-lambda-java-events:3.16.0")
+        implementation("com.amazonaws:aws-lambda-java-events:3.16.1")
         implementation("com.amazonaws:aws-lambda-java-core:1.3.0")
         implementation("com.github.j5ik2o:event-store-adapter-java:1.1.174")
 
@@ -302,7 +302,7 @@ project(":bootstrap") {
         implementation(project(":rmu"))
         implementation("com.github.j5ik2o:event-store-adapter-java:1.1.174")
         implementation("software.amazon.awssdk:dynamodb:2.32.1")
-        implementation("com.amazonaws:aws-lambda-java-events:3.16.0")
+        implementation("com.amazonaws:aws-lambda-java-events:3.16.1")
         implementation("org.springframework.boot:spring-boot-configuration-processor")
         implementation("org.mybatis.spring.boot:mybatis-spring-boot-starter:3.0.5")
     }
