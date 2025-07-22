@@ -6,7 +6,7 @@ plugins {
     java
     id("org.springframework.boot") version "3.5.3"
     id("io.spring.dependency-management") version "1.1.7"
-    id("com.diffplug.spotless") version "7.2.0"
+    id("com.diffplug.spotless") version "7.2.1"
     id("io.github.kobylynskyi.graphql.codegen") version "5.10.0"
     id("com.google.cloud.tools.jib") version "3.4.5"
 }
