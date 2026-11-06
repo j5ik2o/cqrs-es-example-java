@@ -1,6 +1,6 @@
 # FROM --platform=linux/amd64 eclipse-temurin:17-jdk AS build
 ARG TARGETARCH
-FROM --platform=${BUILDPLATFORM} gradle:8.14.6-jdk17 AS build
+FROM --platform=${BUILDPLATFORM} gradle:9.8.2-jdk17 AS build
 WORKDIR /workspace/app
 
 COPY . /workspace/app
