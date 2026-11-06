@@ -226,7 +226,7 @@ project(":query:interface-adaptor") {
         implementation("org.springframework.boot:spring-boot-starter-graphql")
         implementation("com.graphql-java:graphql-java:230521-nf-execution")
         implementation("org.mybatis.spring.boot:mybatis-spring-boot-starter:4.1.0")
-        testImplementation("org.mybatis.spring.boot:mybatis-spring-boot-starter-test:3.0.5")
+        testImplementation("org.mybatis.spring.boot:mybatis-spring-boot-starter-test:4.1.0")
         testImplementation("org.flywaydb:flyway-core:11.20.3")
         testImplementation("org.flywaydb:flyway-mysql:11.20.3")
         implementation("com.tailrocks.graphql:graphql-datetime-spring-boot-starter:6.0.0")
@@ -269,7 +269,7 @@ project(":rmu") {
         implementation(project(":command:domain"))
 
         implementation("org.mybatis.spring.boot:mybatis-spring-boot-starter:4.1.0")
-        testImplementation("org.mybatis.spring.boot:mybatis-spring-boot-starter-test:3.0.5")
+        testImplementation("org.mybatis.spring.boot:mybatis-spring-boot-starter-test:4.1.0")
 
         testImplementation("org.flywaydb:flyway-core:11.20.3")
         testImplementation("org.flywaydb:flyway-mysql:11.20.3")
