@@ -275,7 +275,7 @@ project(":rmu") {
         testImplementation("org.flywaydb:flyway-mysql:11.11.1")
 
         implementation("com.amazonaws:aws-lambda-java-events:3.16.1")
-        implementation("com.amazonaws:aws-lambda-java-core:1.3.0")
+        implementation("com.amazonaws:aws-lambda-java-core:1.4.1")
         implementation("com.github.j5ik2o:event-store-adapter-java:1.1.174")
 
         implementation("com.fasterxml.jackson.core:jackson-databind:2.19.2")
