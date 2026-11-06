@@ -123,7 +123,7 @@ subprojects {
 
 project(":infrastructure") {
     dependencies {
-        implementation("com.github.f4b6a3:ulid-creator:5.2.3")
+        implementation("com.github.f4b6a3:ulid-creator:5.2.4")
     }
 }
 
@@ -131,7 +131,7 @@ project(":command:domain") {
     dependencies {
         implementation("com.github.j5ik2o:event-store-adapter-java:1.1.174")
         implementation(project(":infrastructure"))
-        implementation("com.github.f4b6a3:ulid-creator:5.2.3")
+        implementation("com.github.f4b6a3:ulid-creator:5.2.4")
         implementation("com.fasterxml.jackson.core:jackson-databind:2.19.2")
         implementation("com.fasterxml.jackson.core:jackson-annotations:2.19.2")
         implementation("com.fasterxml.jackson.datatype:jackson-datatype-jsr310:2.19.2")
@@ -155,7 +155,7 @@ project(":command:interface-adaptor-impl") {
         implementation(project(":command:interface-adaptor-if"))
         implementation(project(":command:processor"))
         implementation("com.github.j5ik2o:event-store-adapter-java:1.1.174")
-        implementation("com.github.f4b6a3:ulid-creator:5.2.3")
+        implementation("com.github.f4b6a3:ulid-creator:5.2.4")
 
         implementation("org.springframework.boot:spring-boot-starter")
         testImplementation("org.springframework.boot:spring-boot-starter-test")
