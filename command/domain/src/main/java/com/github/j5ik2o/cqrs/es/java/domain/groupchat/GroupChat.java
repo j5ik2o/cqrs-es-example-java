@@ -3,7 +3,6 @@ package com.github.j5ik2o.cqrs.es.java.domain.groupchat;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.github.f4b6a3.ulid.UlidCreator;
 import com.github.j5ik2o.cqrs.es.java.domain.useraccount.UserAccountId;
-import com.github.j5ik2o.event.store.adapter.java.Aggregate;
 import io.vavr.Tuple2;
 import io.vavr.collection.Vector;
 import io.vavr.control.Either;
@@ -11,7 +10,7 @@ import java.time.Instant;
 import java.util.Objects;
 import javax.annotation.Nonnull;
 
-public final class GroupChat implements Aggregate<GroupChat, GroupChatId> {
+public final class GroupChat {
 
   private final GroupChatId id;
   private final boolean deleted;
@@ -45,7 +44,6 @@ public final class GroupChat implements Aggregate<GroupChat, GroupChatId> {
   }
 
   @Nonnull
-  @Override
   public GroupChatId getId() {
     return id;
   }
@@ -62,17 +60,14 @@ public final class GroupChat implements Aggregate<GroupChat, GroupChatId> {
     return messages;
   }
 
-  @Override
   public long getSequenceNumber() {
     return this.sequenceNumber;
   }
 
-  @Override
   public long getVersion() {
     return this.version;
   }
 
-  @Override
   public GroupChat withVersion(long l) {
     return new GroupChat(id, deleted, name, members, messages, sequenceNumber, l);
   }

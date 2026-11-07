@@ -6,7 +6,7 @@ import com.github.j5ik2o.cqrs.es.java.domain.groupchat.GroupChatEvent;
 import com.github.j5ik2o.cqrs.es.java.domain.groupchat.MemberId;
 import com.github.j5ik2o.cqrs.es.java.domain.groupchat.MemberRole;
 import com.github.j5ik2o.cqrs.es.java.rmu.dao.*;
-import com.github.j5ik2o.event.store.adapter.java.DeserializationException;
+import com.github.j5ik2o.event.store.adapter.java.core.SerializationException;
 import java.nio.ByteBuffer;
 import org.springframework.stereotype.Component;
 
@@ -36,7 +36,7 @@ public class ReadModelUpdater {
                 byte[] bytes = new byte[payloadBytes.remaining()];
                 payloadBytes.get(bytes);
 
-                GroupChatEvent groupChatEvent = serializer.deserialize(bytes, GroupChatEvent.class);
+                GroupChatEvent groupChatEvent = serializer.deserialize(bytes);
                 if (groupChatEvent instanceof GroupChatEvent.Created typedEvent) {
                   insertGroupChat(typedEvent);
                 } else if (groupChatEvent instanceof GroupChatEvent.Deleted typedEvent) {
@@ -52,7 +52,7 @@ public class ReadModelUpdater {
                 } else if (groupChatEvent instanceof GroupChatEvent.MessageDeleted typedEvent) {
                   deleteMessage(typedEvent);
                 }
-              } catch (DeserializationException e) {
+              } catch (SerializationException e) {
                 throw new IllegalStateException("Failed to deserialize event", e);
               }
             });

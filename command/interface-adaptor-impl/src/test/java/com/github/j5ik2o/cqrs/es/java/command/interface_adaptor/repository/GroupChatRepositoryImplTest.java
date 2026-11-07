@@ -10,7 +10,10 @@ import com.github.j5ik2o.cqrs.es.java.domain.groupchat.GroupChatEvent;
 import com.github.j5ik2o.cqrs.es.java.domain.groupchat.GroupChatId;
 import com.github.j5ik2o.cqrs.es.java.domain.groupchat.GroupChatName;
 import com.github.j5ik2o.cqrs.es.java.domain.useraccount.UserAccountId;
-import com.github.j5ik2o.event.store.adapter.java.EventStoreAsync;
+import com.github.j5ik2o.event.store.adapter.java.core.EventStoreConfig;
+import com.github.j5ik2o.event.store.adapter.java.core.RetentionPolicy;
+import com.github.j5ik2o.event.store.adapter.java.dynamodb.DynamoDbEventStore;
+import com.github.j5ik2o.event.store.adapter.java.dynamodb.DynamoDbTableConfig;
 import org.junit.jupiter.api.Test;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -25,8 +28,8 @@ class GroupChatRepositoryImplTest {
 
   private static final String JOURNAL_TABLE_NAME = "journal";
   private static final String SNAPSHOT_TABLE_NAME = "snapshot";
+  private static final String HEAD_TABLE_NAME = "head";
 
-  private static final String JOURNAL_AID_INDEX_NAME = "journal-aid-index";
   private static final String SNAPSHOT_AID_INDEX_NAME = "snapshot-aid-index";
 
   DockerImageName localstackImage = DockerImageName.parse("localstack/localstack:2.1.0");
@@ -38,22 +41,26 @@ class GroupChatRepositoryImplTest {
   @Test
   public void storeAndFindById() {
     try (var client = DynamoDBAsyncUtils.createDynamoDbAsyncClient(localstack)) {
-      DynamoDBAsyncUtils.createJournalTable(client, JOURNAL_TABLE_NAME, JOURNAL_AID_INDEX_NAME)
-          .join();
+      DynamoDBAsyncUtils.createJournalTable(client, JOURNAL_TABLE_NAME).join();
       DynamoDBAsyncUtils.createSnapshotTable(client, SNAPSHOT_TABLE_NAME, SNAPSHOT_AID_INDEX_NAME)
           .join();
+      DynamoDBAsyncUtils.createHeadTable(client, HEAD_TABLE_NAME).join();
       client.listTables().join().tableNames().forEach(System.out::println);
 
-      var eventStore =
-          EventStoreAsync.<GroupChatId, GroupChat, GroupChatEvent>ofDynamoDB(
-                  client,
-                  JOURNAL_TABLE_NAME,
-                  SNAPSHOT_TABLE_NAME,
-                  JOURNAL_AID_INDEX_NAME,
-                  SNAPSHOT_AID_INDEX_NAME,
-                  32)
-              .withSnapshotSerializer(new GroupChatSnapshotSerializer())
-              .withEventSerializer(new GroupChatEventSerializer());
+      var tables =
+          DynamoDbTableConfig.builder()
+              .journalTableName(JOURNAL_TABLE_NAME)
+              .snapshotTableName(SNAPSHOT_TABLE_NAME)
+              .headTableName(HEAD_TABLE_NAME)
+              .snapshotAidIndexName(SNAPSHOT_AID_INDEX_NAME)
+              .retentionPolicy(RetentionPolicy.none())
+              .build();
+      var eventStoreConfig =
+          EventStoreConfig.<GroupChatEvent, GroupChat>builder()
+              .payloadSerializer(new GroupChatEventSerializer())
+              .snapshotSerializer(new GroupChatSnapshotSerializer())
+              .build();
+      var eventStore = DynamoDbEventStore.createAsync(client, tables, eventStoreConfig).join();
 
       var repository = GroupChatRepositoryImpl.of(eventStore);
       var groupChatId = GroupChatId.generate();
@@ -68,6 +75,15 @@ class GroupChatRepositoryImplTest {
 
       assertTrue(groupChatOpt.isDefined());
       assertEquals(groupChat1, groupChatOpt.get());
+
+      var renamed = groupChat1.rename(GroupChatName.of("test-2"), adminId).get();
+      repository.store(renamed._2, renamed._1).join();
+
+      var renamedOpt = repository.findById(groupChat1.getId()).join();
+
+      assertTrue(renamedOpt.isDefined());
+      assertEquals("test-2", renamedOpt.get().getName().asString());
+      assertEquals(2L, renamedOpt.get().getSequenceNumber());
     }
   }
 }
