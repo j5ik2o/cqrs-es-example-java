@@ -24,12 +24,8 @@
     "ParameterValue": "jdbc:mysql://db.example:3306/ceer"
   },
   {
-    "ParameterKey": "DataSourceUsername",
-    "ParameterValue": "ceer"
-  },
-  {
-    "ParameterKey": "DataSourcePassword",
-    "ParameterValue": "CHANGE_ME"
+    "ParameterKey": "DataSourceSecretArn",
+    "ParameterValue": "arn:aws:secretsmanager:ap-northeast-1:123456789012:secret:ceer/db-credentials-AbCdEf"
   },
   {
     "ParameterKey": "VpcId",
@@ -42,5 +38,17 @@
   {
     "ParameterKey": "SecurityGroupIds",
     "ParameterValue": ""
+  },
+  {
+    "ParameterKey": "RecoveryWorkerReservedConcurrency",
+    "ParameterValue": "1"
+  },
+  {
+    "ParameterKey": "AlarmSnsTopicArn",
+    "ParameterValue": ""
+  },
+  {
+    "ParameterKey": "RecoveryBacklogThreshold",
+    "ParameterValue": "10"
   }
 ]
