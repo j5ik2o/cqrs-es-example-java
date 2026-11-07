@@ -50,6 +50,10 @@ services:
         condition: service_healthy
       dynamodb-setup:
         condition: service_completed_successfully
+      mysql:
+        condition: service_healthy
+      refinery:
+        condition: service_completed_successfully
   read-api-server-1:
     command: ["-r"]
     image: cqrs-es-example-java:latest-${ARCH}

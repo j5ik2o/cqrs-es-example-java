@@ -20,9 +20,14 @@ public interface ReadModelPositionMapper {
   /**
    * Makes the row exist before it is locked. A {@code SELECT ... FOR UPDATE} on a missing row takes
    * a gap lock, and two new aggregates in the same gap can deadlock when both insert.
+   *
+   * <p>{@code INSERT ... ON DUPLICATE KEY UPDATE} takes the row lock in one statement, which is
+   * safer than {@code INSERT IGNORE} followed by a lock upgrade when two readers create the same
+   * position row.
    */
   @Insert(
-      "INSERT IGNORE INTO read_model_positions (aggregate_id, seq_nr, updated_at) VALUES (#{aggregateId}, 0, #{updatedAt})")
+      "INSERT INTO read_model_positions (aggregate_id, seq_nr, updated_at) VALUES (#{aggregateId}, 0, #{updatedAt}) "
+          + "ON DUPLICATE KEY UPDATE aggregate_id = aggregate_id")
   int insertIfAbsent(
       @Param("aggregateId") String aggregateId, @Param("updatedAt") Instant updatedAt);
 

@@ -1,29 +1,20 @@
 package com.github.j5ik2o.cqrs.es.java.rmu;
 
+import com.amazonaws.services.lambda.runtime.Context;
 import com.amazonaws.services.lambda.runtime.events.DynamodbEvent;
 import com.amazonaws.services.lambda.runtime.events.models.dynamodb.AttributeValue;
-import com.github.j5ik2o.cqrs.es.java.command.interface_adaptor.repository.serialization.GroupChatEventSerializer;
-import com.github.j5ik2o.cqrs.es.java.domain.groupchat.GroupChatEvent;
-import com.github.j5ik2o.cqrs.es.java.domain.groupchat.GroupChatId;
-import com.github.j5ik2o.cqrs.es.java.rmu.dao.GroupChatRecord;
-import com.github.j5ik2o.cqrs.es.java.rmu.dao.GroupChatWriteMapper;
-import com.github.j5ik2o.cqrs.es.java.rmu.dao.MemberRecord;
-import com.github.j5ik2o.cqrs.es.java.rmu.dao.MemberWriteMapper;
-import com.github.j5ik2o.cqrs.es.java.rmu.dao.MessageRecord;
-import com.github.j5ik2o.cqrs.es.java.rmu.dao.MessageWriteMapper;
-import com.github.j5ik2o.cqrs.es.java.rmu.dao.ReadModelPositionMapper;
-import com.github.j5ik2o.event.store.adapter.java.core.SerializationException;
 import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Comparator;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
-import org.apache.ibatis.session.SqlSession;
 import org.apache.ibatis.session.SqlSessionFactory;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Profile;
 import org.springframework.stereotype.Component;
 
@@ -34,228 +25,218 @@ import org.springframework.stereotype.Component;
  * one write transaction. Duplicate and stale sequence numbers are dropped, a gap in {@code seq_nr}
  * is filled from the journal, and the aggregate's position is written in the same database
  * transaction as the read model change.
+ *
+ * <p>A retryable failure is retried with exponential backoff. A permanent failure, or a retry that
+ * exhausted its budget, is recorded as a recovery task and the aggregate is blocked for the rest of
+ * the batch so the position cannot advance past an unapplied event.
  */
 @Component
 @Profile("local-rmu")
 public class ReadModelUpdater {
   private static final Logger LOGGER = LoggerFactory.getLogger(ReadModelUpdater.class);
   private static final String CONFIG_AGGREGATE_ID = "__config__";
-  private static final String GROUP_CHAT_ID_PREFIX = "GroupChat-";
   private static final String EVENT_NAME_INSERT = "INSERT";
   private static final String EVENT_NAME_MODIFY = "MODIFY";
   private static final String EVENT_NAME_REMOVE = "REMOVE";
 
-  private final SqlSessionFactory sqlSessionFactory;
-  private final JournalReader journalReader;
-  private final GroupChatEventSerializer serializer = new GroupChatEventSerializer();
+  private final EventApplier applier;
+  private final RecoveryService recovery;
+  private final RetryPolicy retryPolicy;
 
+  /** Convenience constructor for tests and callers that do not need recovery. */
   public ReadModelUpdater(SqlSessionFactory sqlSessionFactory, JournalReader journalReader) {
-    this.sqlSessionFactory = sqlSessionFactory;
-    this.journalReader = journalReader;
+    this(new Applier(sqlSessionFactory, journalReader, 1), null, RetryPolicy.noRetry());
   }
 
+  /**
+   * Lambda entry point. Lambda instantiates the handler class with a no-argument constructor, so
+   * this constructor builds the dependencies from environment variables.
+   */
+  public ReadModelUpdater() {
+    var dependencies = LambdaRmuDependencies.create();
+    this.applier = dependencies.applier();
+    this.recovery = dependencies.recoveryService();
+    this.retryPolicy = dependencies.retryPolicy();
+  }
+
+  @Autowired
+  public ReadModelUpdater(EventApplier applier, RecoveryService recovery, RetryPolicy retryPolicy) {
+    this.applier = applier;
+    this.recovery = recovery;
+    this.retryPolicy = retryPolicy;
+  }
+
+  /** Applies every record in order and stops at the first unhandled failure. */
   public void update(DynamodbEvent dynamodbEvent) {
     for (var record : dynamodbEvent.getRecords()) {
-      applyRecord(record);
+      processRecord(record);
     }
   }
 
-  private void applyRecord(DynamodbEvent.DynamodbStreamRecord record) {
+  /** Applies one record. The local stream reader calls this per record. */
+  public void updateRecord(DynamodbEvent.DynamodbStreamRecord record) {
+    processRecord(record);
+  }
+
+  /**
+   * The Lambda entry point. It returns the records that must be redelivered as a partial batch
+   * response.
+   *
+   * <p>Records of an aggregate whose earlier event failed are left for redelivery: the position
+   * rule forbids advancing past an unapplied event, so applying them would only fail again. A
+   * failure that was recorded as a recovery task is not redelivered; the durable task owns it from
+   * then on. If recording the task itself fails, the record is redelivered so the Lambda retry and
+   * OnFailure safety net still apply.
+   */
+  public DynamodbBatchResponse handleRequest(DynamodbEvent dynamodbEvent, Context context) {
+    var failures = new ArrayList<DynamodbBatchResponse.BatchItemFailure>();
+    var blockedAggregates = new HashSet<String>();
+    for (var record : dynamodbEvent.getRecords()) {
+      var aggregateId = aggregateIdOf(record);
+      if (aggregateId != null && blockedAggregates.contains(aggregateId)) {
+        failures.add(new DynamodbBatchResponse.BatchItemFailure(itemIdentifier(record)));
+        continue;
+      }
+      try {
+        var result = processRecord(record);
+        if (result == RecordResult.RECORDED_FAILURE && aggregateId != null) {
+          blockedAggregates.add(aggregateId);
+        }
+      } catch (RuntimeException e) {
+        LOGGER.error(
+            "Failed to apply head stream record: eventId={}, error={}",
+            record.getEventID(),
+            e.getMessage(),
+            e);
+        failures.add(new DynamodbBatchResponse.BatchItemFailure(itemIdentifier(record)));
+        if (aggregateId != null) {
+          blockedAggregates.add(aggregateId);
+        }
+      }
+    }
+    return new DynamodbBatchResponse(List.copyOf(failures));
+  }
+
+  private RecordResult processRecord(DynamodbEvent.DynamodbStreamRecord record) {
+    RecordIdentity identity;
+    try {
+      identity = parseHeadRecord(record);
+    } catch (RuntimeException e) {
+      var fallback = fallbackIdentity(record);
+      if (recovery != null && fallback != null && isRecoverable(e)) {
+        LOGGER.error(
+            "Failed to parse a head record; recorded a recovery task: aid={}, seqNr={}",
+            fallback.aggregateId(),
+            fallback.headSeqNr(),
+            e);
+        recovery.record(fallback.aggregateId(), fallback.headSeqNr(), fallback.headSeqNr(), e);
+        return RecordResult.RECORDED_FAILURE;
+      }
+      throw e;
+    }
+    if (identity.skip()) {
+      return RecordResult.APPLIED;
+    }
+    var lastSeqNr = identity.events().get(identity.events().size() - 1).seqNr();
+    for (var headEvent : identity.events()) {
+      try {
+        retryPolicy.run(() -> applier.applyHeadEvent(identity.aggregateId(), headEvent));
+      } catch (RuntimeException e) {
+        if (recovery == null || !isRecoverable(e)) {
+          throw e;
+        }
+        // A record can carry several events. Recovery must reach the record's last event,
+        // otherwise the events after the failed one wait for another record or a resync.
+        recovery.record(identity.aggregateId(), lastSeqNr, headEvent.seqNr(), e);
+        return RecordResult.RECORDED_FAILURE;
+      }
+    }
+    return RecordResult.APPLIED;
+  }
+
+  private static HeadIdentity fallbackIdentity(DynamodbEvent.DynamodbStreamRecord record) {
+    try {
+      var streamRecord = record.getDynamodb();
+      if (streamRecord == null || streamRecord.getNewImage() == null) {
+        return null;
+      }
+      var image = streamRecord.getNewImage();
+      var aggregateId = getStringAttribute(image, "aid");
+      if (!AggregateType.isGroupChat(aggregateId)) {
+        return null;
+      }
+      return new HeadIdentity(aggregateId, getNumberAttribute(image, "seq_nr"));
+    } catch (RuntimeException e) {
+      return null;
+    }
+  }
+
+  private static boolean isRecoverable(Throwable failure) {
+    return FailureClassifier.classify(failure).isPresent()
+        || failure instanceof RetryPolicy.RetryExhaustedException;
+  }
+
+  private static RecordIdentity parseHeadRecord(DynamodbEvent.DynamodbStreamRecord record) {
     var eventName = record.getEventName();
     if (EVENT_NAME_REMOVE.equals(eventName)) {
-      return;
+      return RecordIdentity.skipped();
     }
     if (!EVENT_NAME_INSERT.equals(eventName) && !EVENT_NAME_MODIFY.equals(eventName)) {
-      throw new ReadModelUpdateException("unexpected stream event name " + eventName);
+      throw PermanentFailure.permanent(
+          FailureKind.EVENT_PAYLOAD, "unexpected stream event name " + eventName);
     }
     var image = getNewImage(record);
     var aggregateId = getStringAttribute(image, "aid");
     if (CONFIG_AGGREGATE_ID.equals(aggregateId)) {
-      return;
+      return RecordIdentity.skipped();
     }
-    if (!aggregateId.startsWith(GROUP_CHAT_ID_PREFIX)) {
+    if (!AggregateType.isGroupChat(aggregateId)) {
       LOGGER.debug("Skipping head record of another aggregate type: aid={}", aggregateId);
-      return;
+      return RecordIdentity.skipped();
     }
-    for (var headEvent : parseHeadEvents(image)) {
-      applyHeadEvent(aggregateId, headEvent);
+    var events = parseHeadEvents(image);
+    if (events.isEmpty()) {
+      throw PermanentFailure.permanent(FailureKind.EVENT_PAYLOAD, "head record has no events");
     }
+    return new RecordIdentity(false, aggregateId, events);
   }
 
-  private void applyHeadEvent(String aggregateId, HeadEvent headEvent) {
-    var groupChatId = GroupChatId.ofString(aggregateId);
-    var position = currentPosition(aggregateId);
-    if (headEvent.seqNr() <= position) {
-      LOGGER.debug(
-          "Skipping duplicate or stale event: aid={}, seqNr={}, position={}",
-          aggregateId,
-          headEvent.seqNr(),
-          position);
-      return;
-    }
-
-    var pending = new ArrayList<HeadEvent>();
-    if (headEvent.seqNr() > position + 1) {
-      var journalEvents =
-          journalReader.readEvents(aggregateId, position + 1, headEvent.seqNr() - 1);
-      requireContiguous(position + 1, headEvent.seqNr() - 1, journalEvents);
-      pending.addAll(journalEvents);
-    }
-    pending.add(headEvent);
-
-    processInTransaction(
-        aggregateId,
-        (session, current) -> {
-          var next = current;
-          for (var event : pending) {
-            if (event.seqNr() <= next) {
-              continue;
-            }
-            if (event.seqNr() != next + 1) {
-              throw new ReadModelUpdateException(
-                  "expected seq_nr " + (next + 1) + " but got " + event.seqNr());
-            }
-            applyEvent(groupChatId, event, session);
-            next = event.seqNr();
-          }
-          return next;
-        });
-  }
-
-  private long currentPosition(String aggregateId) {
-    try (var session = sqlSessionFactory.openSession(true)) {
-      var position = session.getMapper(ReadModelPositionMapper.class).selectSeqNr(aggregateId);
-      return position == null ? 0L : position;
-    }
-  }
-
-  private void processInTransaction(String aggregateId, PositionedWork work) {
-    try (var session = sqlSessionFactory.openSession(false)) {
-      try {
-        var positionMapper = session.getMapper(ReadModelPositionMapper.class);
-        positionMapper.insertIfAbsent(aggregateId, Instant.now());
-        var currentValue = positionMapper.selectSeqNrForUpdate(aggregateId);
-        var current = currentValue == null ? 0L : currentValue;
-        var next = work.apply(session, current);
-        if (next != current) {
-          positionMapper.upsert(aggregateId, next, Instant.now());
-        }
-        session.commit();
-      } catch (RuntimeException | Error e) {
-        try {
-          session.rollback();
-        } catch (RuntimeException rollbackError) {
-          e.addSuppressed(rollbackError);
-        }
-        throw e;
-      }
-    }
-  }
-
-  private void applyEvent(GroupChatId aggregateId, HeadEvent headEvent, SqlSession session) {
-    var groupChatEvent = deserialize(headEvent);
-    var occurredAt = headEvent.occurredAt();
-    var groupChatWriteMapper = session.getMapper(GroupChatWriteMapper.class);
-    var memberWriteMapper = session.getMapper(MemberWriteMapper.class);
-    var messageWriteMapper = session.getMapper(MessageWriteMapper.class);
-
-    if (groupChatEvent instanceof GroupChatEvent.Created typedEvent) {
-      groupChatWriteMapper.insertGroupChat(
-          new GroupChatRecord(
-              aggregateId.asString(),
-              typedEvent.name().asString(),
-              typedEvent.executorId().asString(),
-              occurredAt,
-              occurredAt));
-      var administrator = typedEvent.members().toVector().head();
-      memberWriteMapper.insertMember(
-          new MemberRecord(
-              administrator.getId().asString(),
-              aggregateId.asString(),
-              administrator.getUserAccountId().asString(),
-              administrator.getRole().name(),
-              occurredAt,
-              occurredAt));
-    } else if (groupChatEvent instanceof GroupChatEvent.Deleted) {
-      groupChatWriteMapper.deleteGroupChat(aggregateId.asString(), occurredAt);
-    } else if (groupChatEvent instanceof GroupChatEvent.Renamed typedEvent) {
-      groupChatWriteMapper.updateGroupChatName(
-          aggregateId.asString(), typedEvent.name().asString(), occurredAt);
-    } else if (groupChatEvent instanceof GroupChatEvent.MemberAdded typedEvent) {
-      memberWriteMapper.insertMember(
-          new MemberRecord(
-              typedEvent.member().getId().asString(),
-              aggregateId.asString(),
-              typedEvent.member().getUserAccountId().asString(),
-              typedEvent.member().getRole().name(),
-              occurredAt,
-              occurredAt));
-    } else if (groupChatEvent instanceof GroupChatEvent.MemberRemoved typedEvent) {
-      memberWriteMapper.deleteMember(
-          aggregateId.asString(), typedEvent.member().getUserAccountId().asString());
-    } else if (groupChatEvent instanceof GroupChatEvent.MessagePosted typedEvent) {
-      messageWriteMapper.insertMessage(
-          new MessageRecord(
-              typedEvent.message().getId().asString(),
-              aggregateId.asString(),
-              typedEvent.message().getSenderId().asString(),
-              typedEvent.message().getContent(),
-              occurredAt,
-              occurredAt));
-    } else if (groupChatEvent instanceof GroupChatEvent.MessageEdited typedEvent) {
-      messageWriteMapper.updateMessage(
-          new MessageRecord(
-              typedEvent.message().getId().asString(),
-              aggregateId.asString(),
-              typedEvent.message().getSenderId().asString(),
-              typedEvent.message().getContent(),
-              occurredAt,
-              occurredAt));
-    } else if (groupChatEvent instanceof GroupChatEvent.MessageDeleted typedEvent) {
-      messageWriteMapper.deleteMessage(typedEvent.message().getId().asString(), occurredAt);
-    } else {
-      throw new ReadModelUpdateException("unsupported event type " + groupChatEvent.typeName());
-    }
-  }
-
-  private GroupChatEvent deserialize(HeadEvent headEvent) {
+  private static String aggregateIdOf(DynamodbEvent.DynamodbStreamRecord record) {
     try {
-      var event = serializer.deserialize(headEvent.payload());
-      if (event == null) {
-        throw new ReadModelUpdateException(
-            "failed to deserialize event with seq_nr " + headEvent.seqNr());
+      var streamRecord = record.getDynamodb();
+      if (streamRecord == null || streamRecord.getNewImage() == null) {
+        return null;
       }
-      return event;
-    } catch (SerializationException e) {
-      throw new ReadModelUpdateException(
-          "failed to deserialize event with seq_nr " + headEvent.seqNr(), e);
+      var aggregateId = getStringAttribute(streamRecord.getNewImage(), "aid");
+      if (CONFIG_AGGREGATE_ID.equals(aggregateId) || !AggregateType.isGroupChat(aggregateId)) {
+        return null;
+      }
+      return aggregateId;
+    } catch (RuntimeException e) {
+      return null;
     }
   }
 
-  private static void requireContiguous(long fromSeqNr, long toSeqNr, List<HeadEvent> events) {
-    var expected = fromSeqNr;
-    for (var event : events) {
-      if (event.seqNr() != expected) {
-        throw new ReadModelUpdateException(
-            "journal gap: expected seq_nr " + expected + " but got " + event.seqNr());
-      }
-      expected++;
+  /** DynamoDB batch item failures are identified by the sequence number, not the event id. */
+  private static String itemIdentifier(DynamodbEvent.DynamodbStreamRecord record) {
+    var streamRecord = record.getDynamodb();
+    if (streamRecord != null && streamRecord.getSequenceNumber() != null) {
+      return streamRecord.getSequenceNumber();
     }
-    if (expected != toSeqNr + 1) {
-      throw new ReadModelUpdateException("journal is missing seq_nr " + expected + ".." + toSeqNr);
-    }
+    return record.getEventID();
   }
 
   private static List<HeadEvent> parseHeadEvents(Map<String, AttributeValue> image) {
     var eventsAttribute = image.get("events");
     if (eventsAttribute == null || eventsAttribute.getL() == null) {
-      throw new ReadModelUpdateException("head image has no events attribute");
+      throw PermanentFailure.permanent(
+          FailureKind.EVENT_PAYLOAD, "head image has no events attribute");
     }
     var events = new ArrayList<HeadEvent>();
     for (var item : eventsAttribute.getL()) {
       var fields = item.getM();
       if (fields == null) {
-        throw new ReadModelUpdateException("head event is not a map");
+        throw PermanentFailure.permanent(FailureKind.EVENT_PAYLOAD, "head event is not a map");
       }
       events.add(
           new HeadEvent(
@@ -272,11 +253,11 @@ public class ReadModelUpdater {
       DynamodbEvent.DynamodbStreamRecord record) {
     var streamRecord = record.getDynamodb();
     if (streamRecord == null) {
-      throw new ReadModelUpdateException("streamRecord is null");
+      throw PermanentFailure.permanent(FailureKind.EVENT_PAYLOAD, "streamRecord is null");
     }
     var attributeValues = streamRecord.getNewImage();
     if (attributeValues == null) {
-      throw new ReadModelUpdateException("new image is null");
+      throw PermanentFailure.permanent(FailureKind.EVENT_PAYLOAD, "new image is null");
     }
     return attributeValues;
   }
@@ -284,7 +265,8 @@ public class ReadModelUpdater {
   private static String getStringAttribute(Map<String, AttributeValue> attributes, String name) {
     var attribute = attributes.get(name);
     if (attribute == null || attribute.getS() == null) {
-      throw new ReadModelUpdateException("attribute " + name + " is missing or not a string");
+      throw PermanentFailure.permanent(
+          FailureKind.EVENT_PAYLOAD, "attribute " + name + " is missing or not a string");
     }
     return attribute.getS();
   }
@@ -298,7 +280,8 @@ public class ReadModelUpdater {
   private static long getNumberAttribute(Map<String, AttributeValue> attributes, String name) {
     var attribute = attributes.get(name);
     if (attribute == null || attribute.getN() == null) {
-      throw new ReadModelUpdateException("attribute " + name + " is missing or not a number");
+      throw PermanentFailure.permanent(
+          FailureKind.EVENT_PAYLOAD, "attribute " + name + " is missing or not a number");
     }
     return Long.parseLong(attribute.getN());
   }
@@ -306,7 +289,7 @@ public class ReadModelUpdater {
   private static byte[] getPayload(Map<String, AttributeValue> attributes) {
     var attribute = attributes.get("payload");
     if (attribute == null) {
-      throw new ReadModelUpdateException("head event has no payload");
+      throw PermanentFailure.permanent(FailureKind.EVENT_PAYLOAD, "head event has no payload");
     }
     if (attribute.getB() != null) {
       ByteBuffer buffer = attribute.getB().duplicate();
@@ -317,11 +300,19 @@ public class ReadModelUpdater {
     if (attribute.getS() != null) {
       return attribute.getS().getBytes(StandardCharsets.UTF_8);
     }
-    throw new ReadModelUpdateException("head event has no payload");
+    throw PermanentFailure.permanent(FailureKind.EVENT_PAYLOAD, "head event has no payload");
   }
 
-  @FunctionalInterface
-  private interface PositionedWork {
-    long apply(SqlSession session, long position);
+  private enum RecordResult {
+    APPLIED,
+    RECORDED_FAILURE
   }
+
+  private record RecordIdentity(boolean skip, String aggregateId, List<HeadEvent> events) {
+    static RecordIdentity skipped() {
+      return new RecordIdentity(true, null, List.of());
+    }
+  }
+
+  private record HeadIdentity(String aggregateId, long headSeqNr) {}
 }
