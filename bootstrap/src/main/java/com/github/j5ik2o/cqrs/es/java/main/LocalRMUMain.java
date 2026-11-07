@@ -7,6 +7,8 @@ import io.vavr.collection.HashMap;
 import io.vavr.collection.Map;
 import java.util.ArrayList;
 import java.util.Date;
+import java.util.HashSet;
+import java.util.Set;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.boot.CommandLineRunner;
@@ -22,6 +24,8 @@ import software.amazon.awssdk.services.dynamodb.streams.DynamoDbStreamsClient;
 @Profile("local-rmu")
 public class LocalRMUMain implements CommandLineRunner {
   static final Logger LOGGER = LoggerFactory.getLogger(LocalRMUMain.class);
+  private static final long POLL_INTERVAL_MILLIS = 1000L;
+
   private final ReadModelUpdater readModelUpdater;
   private final AppConfig appConfig;
   private final DynamoDbConfig dynamoDbConfig;
@@ -44,27 +48,109 @@ public class LocalRMUMain implements CommandLineRunner {
         streamDriver(
             dynamodbClient,
             dynamodbStreamsClient,
-            appConfig.getStream().getJournalTableName(),
+            appConfig.getStream().getHeadTableName(),
             appConfig.getStream().getMaxItemCount());
       } catch (Exception ex) {
         LOGGER.warn(
             "An error has occurred, but stream processing is restarted. If this error persists, the read model condition may be incorrect.",
             ex);
       }
-      Thread.sleep(1000L);
+      Thread.sleep(POLL_INTERVAL_MILLIS);
     }
   }
 
-  private Map<String, AttributeValue> getItem(Record record) {
-    var streamRecord = record.dynamodb();
-    var item = streamRecord.newImage();
-    return convertAttributeRecordToMap(HashMap.ofAll(item));
+  /**
+   * Polls every shard of the head table's stream. The first iterator starts at TRIM_HORIZON so a
+   * restart replays the retained records; the read model positions drop what was already applied.
+   */
+  private void streamDriver(
+      DynamoDbClient dynamodbClient,
+      DynamoDbStreamsClient dynamodbStreamsClient,
+      String headTableName,
+      int maxItemCount)
+      throws InterruptedException {
+    var describeTableResponse =
+        dynamodbClient.describeTable(
+            DescribeTableRequest.builder().tableName(headTableName).build());
+    var streamArn = describeTableResponse.table().latestStreamArn();
+    if (streamArn == null) {
+      throw new IllegalStateException("head table " + headTableName + " has no stream");
+    }
+
+    var iterators = new java.util.HashMap<String, String>();
+    Set<String> completedShards = new HashSet<>();
+
+    while (true) {
+      String lastEvaluatedShardId = null;
+      do {
+        var builder = DescribeStreamRequest.builder().streamArn(streamArn);
+        if (lastEvaluatedShardId != null) {
+          builder = builder.exclusiveStartShardId(lastEvaluatedShardId);
+        }
+        var describeStreamResponse = dynamodbStreamsClient.describeStream(builder.build());
+        for (var shard : describeStreamResponse.streamDescription().shards()) {
+          var shardId = shard.shardId();
+          if (completedShards.contains(shardId)) {
+            continue;
+          }
+          var shardIterator = iterators.get(shardId);
+          if (shardIterator == null) {
+            shardIterator =
+                dynamodbStreamsClient
+                    .getShardIterator(
+                        GetShardIteratorRequest.builder()
+                            .shardId(shardId)
+                            .shardIteratorType(ShardIteratorType.TRIM_HORIZON)
+                            .streamArn(streamArn)
+                            .build())
+                    .shardIterator();
+          }
+          while (shardIterator != null) {
+            var getRecordsResponse =
+                dynamodbStreamsClient.getRecords(
+                    GetRecordsRequest.builder()
+                        .shardIterator(shardIterator)
+                        .limit(maxItemCount)
+                        .build());
+            var records = getRecordsResponse.records();
+            if (!records.isEmpty()) {
+              LOGGER.info("records = {}", records.stream().map(Record::eventID).toList());
+            }
+            for (var record : records) {
+              readModelUpdater.update(convertToEvent(record, streamArn));
+            }
+            var nextShardIterator = getRecordsResponse.nextShardIterator();
+            if (nextShardIterator == null) {
+              iterators.remove(shardId);
+              completedShards.add(shardId);
+              break;
+            }
+            iterators.put(shardId, nextShardIterator);
+            shardIterator = nextShardIterator;
+            if (records.isEmpty()) {
+              break;
+            }
+          }
+        }
+        lastEvaluatedShardId = describeStreamResponse.streamDescription().lastEvaluatedShardId();
+      } while (lastEvaluatedShardId != null);
+      Thread.sleep(POLL_INTERVAL_MILLIS);
+    }
   }
 
-  private Map<String, AttributeValue> getKeys(Record record) {
+  private java.util.Map<String, AttributeValue> getItem(Record record) {
+    var streamRecord = record.dynamodb();
+    var item = streamRecord.newImage();
+    if (item == null) {
+      return null;
+    }
+    return convertAttributeRecordToMap(HashMap.ofAll(item)).toJavaMap();
+  }
+
+  private java.util.Map<String, AttributeValue> getKeys(Record record) {
     var streamRecord = record.dynamodb();
     var keys = streamRecord.keys();
-    return convertAttributeRecordToMap(HashMap.ofAll(keys));
+    return convertAttributeRecordToMap(HashMap.ofAll(keys)).toJavaMap();
   }
 
   private Map<String, AttributeValue> convertAttributeRecordToMap(
@@ -78,7 +164,9 @@ public class LocalRMUMain implements CommandLineRunner {
     if (v.s() != null) {
       return new AttributeValue(v.s());
     } else if (v.n() != null) {
-      return new AttributeValue(v.n());
+      var av = new AttributeValue();
+      av.setN(v.n());
+      return av;
     } else if (v.b() != null) {
       var av = new AttributeValue();
       av.setB(v.b().asByteBuffer());
@@ -87,7 +175,7 @@ public class LocalRMUMain implements CommandLineRunner {
       var av = new AttributeValue();
       av.setBOOL(v.bool());
       return av;
-    } else if (v.nul()) {
+    } else if (v.nul() != null && v.nul()) {
       var av = new AttributeValue();
       av.setNULL(true);
       return av;
@@ -114,89 +202,30 @@ public class LocalRMUMain implements CommandLineRunner {
     }
   }
 
-  private void streamDriver(
-      DynamoDbClient dynamodbClient,
-      DynamoDbStreamsClient dynamodbStreamsClient,
-      String journalTableName,
-      int maxItemCount) {
-    var describeTableResponse =
-        dynamodbClient.describeTable(
-            DescribeTableRequest.builder().tableName(journalTableName).build());
-    var streamArn = describeTableResponse.table().latestStreamArn();
-
-    String lastEvaluatedShardId = null;
-
-    for (; ; ) {
-      var builder = DescribeStreamRequest.builder().streamArn(streamArn);
-      if (lastEvaluatedShardId != null) {
-        builder = builder.exclusiveStartShardId(lastEvaluatedShardId);
-      }
-      var describeStreamResponse = dynamodbStreamsClient.describeStream(builder.build());
-      var shards = describeStreamResponse.streamDescription().shards();
-
-      LOGGER.info("shards = {}", shards.stream().map(Shard::shardId).toList());
-
-      for (var shard : shards) {
-        var shardId = shard.shardId();
-        var getShardIteratorResponse =
-            dynamodbStreamsClient.getShardIterator(
-                GetShardIteratorRequest.builder()
-                    .shardId(shardId)
-                    .shardIteratorType(ShardIteratorType.LATEST)
-                    .streamArn(streamArn)
-                    .build());
-        var shardIterator = getShardIteratorResponse.shardIterator();
-        int count = 0;
-        while (shardIterator != null && count < maxItemCount) {
-          var getRecordsResponse =
-              dynamodbStreamsClient.getRecords(
-                  GetRecordsRequest.builder().shardIterator(shardIterator).limit(100).build());
-          var records = getRecordsResponse.records();
-
-          if (!records.isEmpty()) {
-            LOGGER.info("records = {}", records.stream().map(Record::eventID).toList());
-          }
-
-          for (var record : records) {
-            var keys = getKeys(record);
-            var item = getItem(record);
-            LOGGER.info("keys = {}, item = {}", keys, item);
-            var event = convertToEvent(record, keys, item, streamArn);
-            readModelUpdater.update(event);
-          }
-          count += records.size();
-          shardIterator = getRecordsResponse.nextShardIterator();
-        }
-      }
-      if (describeStreamResponse.streamDescription().lastEvaluatedShardId() == null) {
-        break;
-      }
-      lastEvaluatedShardId = describeStreamResponse.streamDescription().lastEvaluatedShardId();
-    }
-  }
-
-  private DynamodbEvent convertToEvent(
-      Record record,
-      Map<String, AttributeValue> keys,
-      Map<String, AttributeValue> item,
-      String streamArn) {
+  private DynamodbEvent convertToEvent(Record record, String streamArn) {
     var event = new DynamodbEvent();
     var streamRecord = new DynamodbEvent.DynamodbStreamRecord();
     streamRecord.setAwsRegion(record.awsRegion());
     streamRecord.setEventID(record.eventID());
-    streamRecord.setEventName(record.eventName().name());
+    streamRecord.setEventName(record.eventNameAsString());
     streamRecord.setEventSource(record.eventSource());
     streamRecord.setEventSourceARN(streamArn);
     streamRecord.setEventVersion(record.eventVersion());
     var sr = new com.amazonaws.services.lambda.runtime.events.models.dynamodb.StreamRecord();
-    sr.setKeys(keys.toJavaMap());
-    sr.setNewImage(item.toJavaMap());
-    sr.setApproximateCreationDateTime(Date.from(record.dynamodb().approximateCreationDateTime()));
+    sr.setKeys(getKeys(record));
+    sr.setNewImage(getItem(record));
+    var approximateCreationDateTime = record.dynamodb().approximateCreationDateTime();
+    if (approximateCreationDateTime != null) {
+      sr.setApproximateCreationDateTime(Date.from(approximateCreationDateTime));
+    }
     sr.setSequenceNumber(record.dynamodb().sequenceNumber());
     sr.setSizeBytes(record.dynamodb().sizeBytes());
-    sr.setStreamViewType(
-        com.amazonaws.services.lambda.runtime.events.models.dynamodb.StreamViewType.valueOf(
-            record.dynamodb().streamViewType().name()));
+    var streamViewType = record.dynamodb().streamViewType();
+    if (streamViewType != null) {
+      sr.setStreamViewType(
+          com.amazonaws.services.lambda.runtime.events.models.dynamodb.StreamViewType.valueOf(
+              streamViewType.name()));
+    }
     streamRecord.setDynamodb(sr);
     var streamRecords = new ArrayList<DynamodbEvent.DynamodbStreamRecord>();
     streamRecords.add(streamRecord);

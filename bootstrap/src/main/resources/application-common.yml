@@ -2,6 +2,11 @@ server:
   port: 48080
 
 spring:
+  # mybatis-spring-boot-starter 4.1.0 pulls spring-boot-jdbc 4.1.0, which registers the
+  # same DataSourcePoolMetadataProvidersConfiguration bean as Spring Boot 3.5.16.
+  # Remove this once the dependency alignment in #587 lands.
+  main:
+    allow-bean-definition-overriding: true
   graphql:
     graphiql:
       enabled: true
@@ -26,5 +31,6 @@ app:
     snapshot-aid-index-name: snapshot-aid-index
     snapshot-interval: 10
   stream:
+    head-table-name: head
     journal-table-name: journal
     max-item-count: 32

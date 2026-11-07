@@ -274,6 +274,10 @@ project(":query:interface-adaptor") {
 }
 
 project(":rmu") {
+    tasks.test {
+        enabled = true
+    }
+
     dependencies {
         implementation(project(":infrastructure"))
         implementation(project(":command:interface-adaptor-impl"))
@@ -284,10 +288,14 @@ project(":rmu") {
 
         testImplementation("org.flywaydb:flyway-core:13.12.1")
         testImplementation("org.flywaydb:flyway-mysql:13.12.1")
+        testImplementation("org.testcontainers:localstack:1.21.4")
+        testImplementation("org.testcontainers:mysql:1.21.4")
+        testImplementation("mysql:mysql-connector-java:8.0.33")
 
         implementation("com.amazonaws:aws-lambda-java-events:3.16.1")
         implementation("com.amazonaws:aws-lambda-java-core:1.4.1")
         implementation("io.github.j5ik2o:event-store-adapter-java:5.1.0")
+        implementation("software.amazon.awssdk:dynamodb:2.57.11")
 
         implementation("com.fasterxml.jackson.core:jackson-databind:2.22.4")
         implementation("com.fasterxml.jackson.core:jackson-annotations:2.22")

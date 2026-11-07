@@ -19,6 +19,7 @@ import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.Profile;
 import software.amazon.awssdk.auth.credentials.AwsBasicCredentials;
 import software.amazon.awssdk.auth.credentials.StaticCredentialsProvider;
+import software.amazon.awssdk.regions.Region;
 import software.amazon.awssdk.services.dynamodb.DynamoDbAsyncClient;
 
 @Configuration
@@ -40,6 +41,9 @@ public class RepositoryConfig {
   @Value("${app.persistence.snapshot-interval}")
   private long snapshotInterval;
 
+  @Value("${app.dynamo-db.region}")
+  private String dynamodbRegion;
+
   @Value("${app.dynamo-db.endpoint-url}")
   private String dynamodbEndpointUrl;
 
@@ -59,6 +63,7 @@ public class RepositoryConfig {
   public DynamoDbAsyncClient dynamoDbAsyncClient() {
     if (hasDynamoDbConfig()) {
       return DynamoDbAsyncClient.builder()
+          .region(Region.of(dynamodbRegion))
           .endpointOverride(URI.create(dynamodbEndpointUrl))
           .credentialsProvider(
               StaticCredentialsProvider.create(
