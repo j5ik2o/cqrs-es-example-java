@@ -5,7 +5,7 @@ import java.time.LocalDateTime;
 public record MessageRecord(
     String id,
     String groupChatId,
-    String content,
-    String senderId,
+    String userAccountId,
+    String text,
     LocalDateTime createdAt,
     LocalDateTime updatedAt) {}
