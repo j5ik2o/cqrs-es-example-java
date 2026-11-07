@@ -22,9 +22,12 @@ services:
       APP_DYNAMO_DB_ACCESS_KEY_ID: x
       APP_DYNAMO_DB_SECRET_ACCESS_KEY: x
     depends_on:
-      - localstack
-      - dynamodb-admin
-      - dynamodb-setup
+      localstack:
+        condition: service_healthy
+      dynamodb-admin:
+        condition: service_started
+      dynamodb-setup:
+        condition: service_completed_successfully
   read-model-updater-1:
     command: ["-l"]
     image: cqrs-es-example-java:latest-${ARCH}
@@ -45,9 +48,12 @@ services:
       SPRING_DATASOURCE_USERNAME: ceer
       SPRING_DATASOURCE_PASSWORD: ceer
     depends_on:
-      - localstack
-      - dynamodb-admin
-      - dynamodb-setup
+      localstack:
+        condition: service_healthy
+      dynamodb-admin:
+        condition: service_started
+      dynamodb-setup:
+        condition: service_completed_successfully
   read-api-server-1:
     command: ["-r"]
     image: cqrs-es-example-java:latest-${ARCH}
