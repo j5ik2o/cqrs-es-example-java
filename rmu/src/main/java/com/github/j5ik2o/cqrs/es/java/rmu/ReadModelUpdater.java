@@ -217,13 +217,18 @@ public class ReadModelUpdater {
     }
   }
 
-  /** DynamoDB batch item failures are identified by the sequence number, not the event id. */
+  /**
+   * DynamoDB batch item failures are identified by the sequence number, not the event id. Without a
+   * sequence number Lambda cannot check point the batch, so the whole invocation fails and the
+   * batch is retried instead of silently dropping the record.
+   */
   private static String itemIdentifier(DynamodbEvent.DynamodbStreamRecord record) {
     var streamRecord = record.getDynamodb();
     if (streamRecord != null && streamRecord.getSequenceNumber() != null) {
       return streamRecord.getSequenceNumber();
     }
-    return record.getEventID();
+    throw PermanentFailure.permanent(
+        FailureKind.EVENT_PAYLOAD, "stream record has no sequence number");
   }
 
   private static List<HeadEvent> parseHeadEvents(Map<String, AttributeValue> image) {

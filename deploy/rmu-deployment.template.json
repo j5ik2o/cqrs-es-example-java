@@ -1,0 +1,865 @@
+{
+  "AWSTemplateFormatVersion": "2010-09-09",
+  "Description": "RMU Lambda, head-stream event source mapping, OnFailure SQS, and SQS recovery worker for cqrs-es-example-java. The Lambda code artifact is supplied as parameters; this repository does not build or upload it.",
+  "Metadata": {
+    "Project": "cqrs-es-example-java",
+    "Issue": "https://github.com/j5ik2o/cqrs-es-example-java/issues/625"
+  },
+  "Parameters": {
+    "CodeS3Bucket": {
+      "Type": "String",
+      "Description": "S3 bucket that holds the RMU Lambda deployment package."
+    },
+    "CodeS3Key": {
+      "Type": "String",
+      "Description": "S3 key of the RMU Lambda deployment package. It must contain both the RMU and the recovery worker handlers and their dependencies."
+    },
+    "HeadStreamArn": {
+      "Type": "String",
+      "Description": "ARN of the head table's DynamoDB stream."
+    },
+    "HeadTableName": {
+      "Type": "String",
+      "Default": "head"
+    },
+    "JournalTableName": {
+      "Type": "String",
+      "Default": "journal"
+    },
+    "DataSourceUrl": {
+      "Type": "String",
+      "NoEcho": true,
+      "Description": "JDBC URL of the MySQL read model, for example jdbc:mysql://db.example:3306/ceer."
+    },
+    "DataSourceUsername": {
+      "Type": "String",
+      "NoEcho": true
+    },
+    "DataSourcePassword": {
+      "Type": "String",
+      "NoEcho": true
+    },
+    "VpcId": {
+      "Type": "String",
+      "Default": "",
+      "Description": "VPC of the MySQL instance. Leave empty when the database is reachable without a VPC attachment."
+    },
+    "SubnetIds": {
+      "Type": "CommaDelimitedList",
+      "Default": "",
+      "Description": "Subnets of the Lambda functions. Required when VpcId is set."
+    },
+    "SecurityGroupIds": {
+      "Type": "CommaDelimitedList",
+      "Default": "",
+      "Description": "Security groups of the Lambda functions. Required when VpcId is set."
+    },
+    "RmuTimeoutSeconds": {
+      "Type": "Number",
+      "Default": 300,
+      "MinValue": 31,
+      "MaxValue": 900,
+      "Description": "RMU function timeout. It must exceed the retry elapsed budget (30000 ms) plus database work."
+    },
+    "RecoveryWorkerTimeoutSeconds": {
+      "Type": "Number",
+      "Default": 300,
+      "MinValue": 30,
+      "MaxValue": 900
+    },
+    "ResyncWorkerTimeoutSeconds": {
+      "Type": "Number",
+      "Default": 900,
+      "MinValue": 30,
+      "MaxValue": 900,
+      "Description": "The resync worker scans every head, so it gets the Lambda maximum by default."
+    },
+    "RecoveryScheduleExpression": {
+      "Type": "String",
+      "Default": "rate(5 minutes)",
+      "Description": "EventBridge schedule for the recovery worker. It drains pending tasks even when no SQS notification arrives."
+    },
+    "ResyncScheduleExpression": {
+      "Type": "String",
+      "Default": "rate(1 day)",
+      "Description": "EventBridge schedule for the full head resync."
+    },
+    "RmuBatchSize": {
+      "Type": "Number",
+      "Default": 100,
+      "MinValue": 1,
+      "MaxValue": 10000
+    },
+    "MaximumRetryAttempts": {
+      "Type": "Number",
+      "Default": 3,
+      "MinValue": 0,
+      "MaxValue": 10000,
+      "Description": "Lambda retries before a failed stream record goes to the OnFailure queue."
+    },
+    "MaximumRecordAgeInSeconds": {
+      "Type": "Number",
+      "Default": 604800,
+      "MinValue": 60,
+      "MaxValue": 604800
+    },
+    "RetryMaxAttempts": {
+      "Type": "Number",
+      "Default": 5
+    },
+    "RetryMaxElapsedMillis": {
+      "Type": "Number",
+      "Default": 30000
+    },
+    "RetryInitialDelayMillis": {
+      "Type": "Number",
+      "Default": 200
+    },
+    "RetryMaxDelayMillis": {
+      "Type": "Number",
+      "Default": 5000
+    },
+    "MaxEventsPerTransaction": {
+      "Type": "Number",
+      "Default": 1
+    },
+    "RecoveryMaxTasksPerRun": {
+      "Type": "Number",
+      "Default": 50,
+      "MinValue": 1
+    },
+    "RecoveryQueueVisibilityTimeoutSeconds": {
+      "Type": "Number",
+      "Default": 1800,
+      "MinValue": 30,
+      "MaxValue": 43200,
+      "Description": "Must stay at or above RecoveryWorkerTimeoutSeconds. Six times the function timeout is the AWS recommendation."
+    },
+    "OnFailureMaxReceiveCount": {
+      "Type": "Number",
+      "Default": 5
+    },
+    "RecoveryMaxReceiveCount": {
+      "Type": "Number",
+      "Default": 5
+    }
+  },
+  "Conditions": {
+    "UsesVpc": {
+      "Fn::Not": [
+        {
+          "Fn::Equals": [
+            {
+              "Ref": "VpcId"
+            },
+            ""
+          ]
+        }
+      ]
+    }
+  },
+  "Resources": {
+    "OnFailureDlq": {
+      "Type": "AWS::SQS::Queue",
+      "Properties": {
+        "QueueName": {
+          "Fn::Sub": "${AWS::StackName}-rmu-on-failure-dlq"
+        },
+        "MessageRetentionPeriod": 1209600,
+        "VisibilityTimeout": 60
+      }
+    },
+    "OnFailureQueue": {
+      "Type": "AWS::SQS::Queue",
+      "Properties": {
+        "QueueName": {
+          "Fn::Sub": "${AWS::StackName}-rmu-on-failure"
+        },
+        "MessageRetentionPeriod": 1209600,
+        "VisibilityTimeout": 60,
+        "RedrivePolicy": {
+          "deadLetterTargetArn": {
+            "Fn::GetAtt": [
+              "OnFailureDlq",
+              "Arn"
+            ]
+          },
+          "maxReceiveCount": {
+            "Ref": "OnFailureMaxReceiveCount"
+          }
+        }
+      }
+    },
+    "RecoveryDlq": {
+      "Type": "AWS::SQS::Queue",
+      "Properties": {
+        "QueueName": {
+          "Fn::Sub": "${AWS::StackName}-rmu-recovery-dlq"
+        },
+        "MessageRetentionPeriod": 1209600,
+        "VisibilityTimeout": 60
+      }
+    },
+    "RecoveryQueue": {
+      "Type": "AWS::SQS::Queue",
+      "Properties": {
+        "QueueName": {
+          "Fn::Sub": "${AWS::StackName}-rmu-recovery"
+        },
+        "MessageRetentionPeriod": 1209600,
+        "VisibilityTimeout": {
+          "Ref": "RecoveryQueueVisibilityTimeoutSeconds"
+        },
+        "RedrivePolicy": {
+          "deadLetterTargetArn": {
+            "Fn::GetAtt": [
+              "RecoveryDlq",
+              "Arn"
+            ]
+          },
+          "maxReceiveCount": {
+            "Ref": "RecoveryMaxReceiveCount"
+          }
+        }
+      }
+    },
+    "RmuFunctionRole": {
+      "Type": "AWS::IAM::Role",
+      "Properties": {
+        "AssumeRolePolicyDocument": {
+          "Version": "2012-10-17",
+          "Statement": [
+            {
+              "Effect": "Allow",
+              "Principal": {
+                "Service": "lambda.amazonaws.com"
+              },
+              "Action": "sts:AssumeRole"
+            }
+          ]
+        },
+        "ManagedPolicyArns": [
+          {
+            "Fn::Sub": "arn:${AWS::Partition}:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole"
+          },
+          {
+            "Fn::Sub": "arn:${AWS::Partition}:iam::aws:policy/service-role/AWSLambdaVPCAccessExecutionRole"
+          }
+        ],
+        "Policies": [
+          {
+            "PolicyName": "rmu-stream-tables-and-queues",
+            "PolicyDocument": {
+              "Version": "2012-10-17",
+              "Statement": [
+                {
+                  "Sid": "ReadHeadStream",
+                  "Effect": "Allow",
+                  "Action": [
+                    "dynamodb:DescribeStream",
+                    "dynamodb:GetRecords",
+                    "dynamodb:GetShardIterator",
+                    "dynamodb:ListStreams"
+                  ],
+                  "Resource": {
+                    "Ref": "HeadStreamArn"
+                  }
+                },
+                {
+                  "Sid": "ReadHeadAndJournalTables",
+                  "Effect": "Allow",
+                  "Action": [
+                    "dynamodb:GetItem",
+                    "dynamodb:BatchGetItem",
+                    "dynamodb:Query",
+                    "dynamodb:Scan"
+                  ],
+                  "Resource": [
+                    {
+                      "Fn::Sub": "arn:${AWS::Partition}:dynamodb:${AWS::Region}:${AWS::AccountId}:table/${HeadTableName}"
+                    },
+                    {
+                      "Fn::Sub": "arn:${AWS::Partition}:dynamodb:${AWS::Region}:${AWS::AccountId}:table/${JournalTableName}"
+                    }
+                  ]
+                },
+                {
+                  "Sid": "SendRecoveryAndFailureMessages",
+                  "Effect": "Allow",
+                  "Action": "sqs:SendMessage",
+                  "Resource": [
+                    {
+                      "Fn::GetAtt": [
+                        "RecoveryQueue",
+                        "Arn"
+                      ]
+                    },
+                    {
+                      "Fn::GetAtt": [
+                        "OnFailureQueue",
+                        "Arn"
+                      ]
+                    }
+                  ]
+                }
+              ]
+            }
+          }
+        ]
+      }
+    },
+    "RecoveryWorkerFunctionRole": {
+      "Type": "AWS::IAM::Role",
+      "Properties": {
+        "AssumeRolePolicyDocument": {
+          "Version": "2012-10-17",
+          "Statement": [
+            {
+              "Effect": "Allow",
+              "Principal": {
+                "Service": "lambda.amazonaws.com"
+              },
+              "Action": "sts:AssumeRole"
+            }
+          ]
+        },
+        "ManagedPolicyArns": [
+          {
+            "Fn::Sub": "arn:${AWS::Partition}:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole"
+          },
+          {
+            "Fn::Sub": "arn:${AWS::Partition}:iam::aws:policy/service-role/AWSLambdaVPCAccessExecutionRole"
+          }
+        ],
+        "Policies": [
+          {
+            "PolicyName": "rmu-recovery-worker-tables-and-queue",
+            "PolicyDocument": {
+              "Version": "2012-10-17",
+              "Statement": [
+                {
+                  "Sid": "ReadHeadAndJournalTables",
+                  "Effect": "Allow",
+                  "Action": [
+                    "dynamodb:GetItem",
+                    "dynamodb:BatchGetItem",
+                    "dynamodb:Query",
+                    "dynamodb:Scan"
+                  ],
+                  "Resource": [
+                    {
+                      "Fn::Sub": "arn:${AWS::Partition}:dynamodb:${AWS::Region}:${AWS::AccountId}:table/${HeadTableName}"
+                    },
+                    {
+                      "Fn::Sub": "arn:${AWS::Partition}:dynamodb:${AWS::Region}:${AWS::AccountId}:table/${JournalTableName}"
+                    }
+                  ]
+                },
+                {
+                  "Sid": "ConsumeRecoveryQueue",
+                  "Effect": "Allow",
+                  "Action": [
+                    "sqs:ReceiveMessage",
+                    "sqs:DeleteMessage",
+                    "sqs:GetQueueAttributes",
+                    "sqs:ChangeMessageVisibility"
+                  ],
+                  "Resource": {
+                    "Fn::GetAtt": [
+                      "RecoveryQueue",
+                      "Arn"
+                    ]
+                  }
+                }
+              ]
+            }
+          }
+        ]
+      }
+    },
+    "RmuFunction": {
+      "Type": "AWS::Lambda::Function",
+      "Properties": {
+        "FunctionName": {
+          "Fn::Sub": "${AWS::StackName}-rmu"
+        },
+        "Runtime": "java17",
+        "Handler": "com.github.j5ik2o.cqrs.es.java.rmu.ReadModelUpdater::handleRequest",
+        "Code": {
+          "S3Bucket": {
+            "Ref": "CodeS3Bucket"
+          },
+          "S3Key": {
+            "Ref": "CodeS3Key"
+          }
+        },
+        "Timeout": {
+          "Ref": "RmuTimeoutSeconds"
+        },
+        "MemorySize": 1024,
+        "Role": {
+          "Fn::GetAtt": [
+            "RmuFunctionRole",
+            "Arn"
+          ]
+        },
+        "VpcConfig": {
+          "Fn::If": [
+            "UsesVpc",
+            {
+              "SubnetIds": {
+                "Ref": "SubnetIds"
+              },
+              "SecurityGroupIds": {
+                "Ref": "SecurityGroupIds"
+              }
+            },
+            {
+              "Ref": "AWS::NoValue"
+            }
+          ]
+        },
+        "Environment": {
+          "Variables": {
+            "APP_STREAM_HEAD_TABLE_NAME": {
+              "Ref": "HeadTableName"
+            },
+            "APP_STREAM_JOURNAL_TABLE_NAME": {
+              "Ref": "JournalTableName"
+            },
+            "APP_STREAM_MAX_EVENTS_PER_TRANSACTION": {
+              "Fn::Sub": "${MaxEventsPerTransaction}"
+            },
+            "APP_STREAM_RETRY_MAX_ATTEMPTS": {
+              "Fn::Sub": "${RetryMaxAttempts}"
+            },
+            "APP_STREAM_RETRY_MAX_ELAPSED_MILLIS": {
+              "Fn::Sub": "${RetryMaxElapsedMillis}"
+            },
+            "APP_STREAM_RETRY_INITIAL_DELAY_MILLIS": {
+              "Fn::Sub": "${RetryInitialDelayMillis}"
+            },
+            "APP_STREAM_RETRY_MAX_DELAY_MILLIS": {
+              "Fn::Sub": "${RetryMaxDelayMillis}"
+            },
+            "APP_RECOVERY_QUEUE_URL": {
+              "Ref": "RecoveryQueue"
+            },
+            "APP_RECOVERY_MAX_TASKS_PER_RUN": {
+              "Fn::Sub": "${RecoveryMaxTasksPerRun}"
+            },
+            "SPRING_DATASOURCE_URL": {
+              "Ref": "DataSourceUrl"
+            },
+            "SPRING_DATASOURCE_USERNAME": {
+              "Ref": "DataSourceUsername"
+            },
+            "SPRING_DATASOURCE_PASSWORD": {
+              "Ref": "DataSourcePassword"
+            }
+          }
+        }
+      }
+    },
+    "RmuEventSourceMapping": {
+      "Type": "AWS::Lambda::EventSourceMapping",
+      "Properties": {
+        "FunctionName": {
+          "Ref": "RmuFunction"
+        },
+        "EventSourceArn": {
+          "Ref": "HeadStreamArn"
+        },
+        "StartingPosition": "TRIM_HORIZON",
+        "BatchSize": {
+          "Ref": "RmuBatchSize"
+        },
+        "MaximumBatchingWindowInSeconds": 1,
+        "BisectBatchOnFunctionError": true,
+        "FunctionResponseTypes": [
+          "ReportBatchItemFailures"
+        ],
+        "MaximumRetryAttempts": {
+          "Ref": "MaximumRetryAttempts"
+        },
+        "MaximumRecordAgeInSeconds": {
+          "Ref": "MaximumRecordAgeInSeconds"
+        },
+        "DestinationConfig": {
+          "OnFailure": {
+            "Destination": {
+              "Fn::GetAtt": [
+                "OnFailureQueue",
+                "Arn"
+              ]
+            }
+          }
+        }
+      }
+    },
+    "RecoveryWorkerFunction": {
+      "Type": "AWS::Lambda::Function",
+      "Properties": {
+        "FunctionName": {
+          "Fn::Sub": "${AWS::StackName}-rmu-recovery-worker"
+        },
+        "Runtime": "java17",
+        "Handler": "com.github.j5ik2o.cqrs.es.java.rmu.RecoveryWorker::handleRequest",
+        "Code": {
+          "S3Bucket": {
+            "Ref": "CodeS3Bucket"
+          },
+          "S3Key": {
+            "Ref": "CodeS3Key"
+          }
+        },
+        "Timeout": {
+          "Ref": "RecoveryWorkerTimeoutSeconds"
+        },
+        "MemorySize": 1024,
+        "Role": {
+          "Fn::GetAtt": [
+            "RecoveryWorkerFunctionRole",
+            "Arn"
+          ]
+        },
+        "VpcConfig": {
+          "Fn::If": [
+            "UsesVpc",
+            {
+              "SubnetIds": {
+                "Ref": "SubnetIds"
+              },
+              "SecurityGroupIds": {
+                "Ref": "SecurityGroupIds"
+              }
+            },
+            {
+              "Ref": "AWS::NoValue"
+            }
+          ]
+        },
+        "Environment": {
+          "Variables": {
+            "APP_STREAM_HEAD_TABLE_NAME": {
+              "Ref": "HeadTableName"
+            },
+            "APP_STREAM_JOURNAL_TABLE_NAME": {
+              "Ref": "JournalTableName"
+            },
+            "APP_RECOVERY_MAX_TASKS_PER_RUN": {
+              "Fn::Sub": "${RecoveryMaxTasksPerRun}"
+            },
+            "SPRING_DATASOURCE_URL": {
+              "Ref": "DataSourceUrl"
+            },
+            "SPRING_DATASOURCE_USERNAME": {
+              "Ref": "DataSourceUsername"
+            },
+            "SPRING_DATASOURCE_PASSWORD": {
+              "Ref": "DataSourcePassword"
+            }
+          }
+        }
+      }
+    },
+    "RecoveryWorkerEventSourceMapping": {
+      "Type": "AWS::Lambda::EventSourceMapping",
+      "Properties": {
+        "FunctionName": {
+          "Ref": "RecoveryWorkerFunction"
+        },
+        "EventSourceArn": {
+          "Fn::GetAtt": [
+            "RecoveryQueue",
+            "Arn"
+          ]
+        },
+        "BatchSize": 1,
+        "MaximumBatchingWindowInSeconds": 0,
+        "FunctionResponseTypes": [
+          "ReportBatchItemFailures"
+        ]
+      }
+    },
+    "RecoveryWorkerSchedule": {
+      "Type": "AWS::Events::Rule",
+      "Properties": {
+        "Name": {
+          "Fn::Sub": "${AWS::StackName}-rmu-recovery-schedule"
+        },
+        "Description": "Drains pending recovery tasks even when no SQS notification arrives.",
+        "ScheduleExpression": {
+          "Ref": "RecoveryScheduleExpression"
+        },
+        "State": "ENABLED",
+        "Targets": [
+          {
+            "Arn": {
+              "Fn::GetAtt": [
+                "RecoveryWorkerFunction",
+                "Arn"
+              ]
+            },
+            "Id": "recovery-worker"
+          }
+        ]
+      }
+    },
+    "RecoveryWorkerSchedulePermission": {
+      "Type": "AWS::Lambda::Permission",
+      "Properties": {
+        "Action": "lambda:InvokeFunction",
+        "FunctionName": {
+          "Ref": "RecoveryWorkerFunction"
+        },
+        "Principal": "events.amazonaws.com",
+        "SourceArn": {
+          "Fn::GetAtt": [
+            "RecoveryWorkerSchedule",
+            "Arn"
+          ]
+        }
+      }
+    },
+    "ResyncWorkerFunctionRole": {
+      "Type": "AWS::IAM::Role",
+      "Properties": {
+        "AssumeRolePolicyDocument": {
+          "Version": "2012-10-17",
+          "Statement": [
+            {
+              "Effect": "Allow",
+              "Principal": {
+                "Service": "lambda.amazonaws.com"
+              },
+              "Action": "sts:AssumeRole"
+            }
+          ]
+        },
+        "ManagedPolicyArns": [
+          {
+            "Fn::Sub": "arn:${AWS::Partition}:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole"
+          },
+          {
+            "Fn::Sub": "arn:${AWS::Partition}:iam::aws:policy/service-role/AWSLambdaVPCAccessExecutionRole"
+          }
+        ],
+        "Policies": [
+          {
+            "PolicyName": "rmu-resync-worker-tables-and-queue",
+            "PolicyDocument": {
+              "Version": "2012-10-17",
+              "Statement": [
+                {
+                  "Sid": "ReadHeadAndJournalTables",
+                  "Effect": "Allow",
+                  "Action": [
+                    "dynamodb:GetItem",
+                    "dynamodb:BatchGetItem",
+                    "dynamodb:Query",
+                    "dynamodb:Scan"
+                  ],
+                  "Resource": [
+                    {
+                      "Fn::Sub": "arn:${AWS::Partition}:dynamodb:${AWS::Region}:${AWS::AccountId}:table/${HeadTableName}"
+                    },
+                    {
+                      "Fn::Sub": "arn:${AWS::Partition}:dynamodb:${AWS::Region}:${AWS::AccountId}:table/${JournalTableName}"
+                    }
+                  ]
+                },
+                {
+                  "Sid": "SendRecoveryMessages",
+                  "Effect": "Allow",
+                  "Action": "sqs:SendMessage",
+                  "Resource": {
+                    "Fn::GetAtt": [
+                      "RecoveryQueue",
+                      "Arn"
+                    ]
+                  }
+                }
+              ]
+            }
+          }
+        ]
+      }
+    },
+    "ResyncWorkerFunction": {
+      "Type": "AWS::Lambda::Function",
+      "Properties": {
+        "FunctionName": {
+          "Fn::Sub": "${AWS::StackName}-rmu-resync-worker"
+        },
+        "Runtime": "java17",
+        "Handler": "com.github.j5ik2o.cqrs.es.java.rmu.ResyncWorker::handleRequest",
+        "Code": {
+          "S3Bucket": {
+            "Ref": "CodeS3Bucket"
+          },
+          "S3Key": {
+            "Ref": "CodeS3Key"
+          }
+        },
+        "Timeout": {
+          "Ref": "ResyncWorkerTimeoutSeconds"
+        },
+        "MemorySize": 1024,
+        "Role": {
+          "Fn::GetAtt": [
+            "ResyncWorkerFunctionRole",
+            "Arn"
+          ]
+        },
+        "VpcConfig": {
+          "Fn::If": [
+            "UsesVpc",
+            {
+              "SubnetIds": {
+                "Ref": "SubnetIds"
+              },
+              "SecurityGroupIds": {
+                "Ref": "SecurityGroupIds"
+              }
+            },
+            {
+              "Ref": "AWS::NoValue"
+            }
+          ]
+        },
+        "Environment": {
+          "Variables": {
+            "APP_STREAM_HEAD_TABLE_NAME": {
+              "Ref": "HeadTableName"
+            },
+            "APP_STREAM_JOURNAL_TABLE_NAME": {
+              "Ref": "JournalTableName"
+            },
+            "APP_RECOVERY_QUEUE_URL": {
+              "Ref": "RecoveryQueue"
+            },
+            "APP_RECOVERY_MAX_TASKS_PER_RUN": {
+              "Fn::Sub": "${RecoveryMaxTasksPerRun}"
+            },
+            "SPRING_DATASOURCE_URL": {
+              "Ref": "DataSourceUrl"
+            },
+            "SPRING_DATASOURCE_USERNAME": {
+              "Ref": "DataSourceUsername"
+            },
+            "SPRING_DATASOURCE_PASSWORD": {
+              "Ref": "DataSourcePassword"
+            }
+          }
+        }
+      }
+    },
+    "ResyncWorkerSchedule": {
+      "Type": "AWS::Events::Rule",
+      "Properties": {
+        "Name": {
+          "Fn::Sub": "${AWS::StackName}-rmu-resync-schedule"
+        },
+        "Description": "Rebuilds lag from the journal after a long stream outage or a deployment.",
+        "ScheduleExpression": {
+          "Ref": "ResyncScheduleExpression"
+        },
+        "State": "ENABLED",
+        "Targets": [
+          {
+            "Arn": {
+              "Fn::GetAtt": [
+                "ResyncWorkerFunction",
+                "Arn"
+              ]
+            },
+            "Id": "resync-worker"
+          }
+        ]
+      }
+    },
+    "ResyncWorkerSchedulePermission": {
+      "Type": "AWS::Lambda::Permission",
+      "Properties": {
+        "Action": "lambda:InvokeFunction",
+        "FunctionName": {
+          "Ref": "ResyncWorkerFunction"
+        },
+        "Principal": "events.amazonaws.com",
+        "SourceArn": {
+          "Fn::GetAtt": [
+            "ResyncWorkerSchedule",
+            "Arn"
+          ]
+        }
+      }
+    }
+  },
+  "Outputs": {
+    "RmuFunctionName": {
+      "Value": {
+        "Ref": "RmuFunction"
+      }
+    },
+    "RmuFunctionArn": {
+      "Value": {
+        "Fn::GetAtt": [
+          "RmuFunction",
+          "Arn"
+        ]
+      }
+    },
+    "RmuEventSourceMappingId": {
+      "Value": {
+        "Ref": "RmuEventSourceMapping"
+      }
+    },
+    "OnFailureQueueArn": {
+      "Value": {
+        "Fn::GetAtt": [
+          "OnFailureQueue",
+          "Arn"
+        ]
+      }
+    },
+    "OnFailureQueueUrl": {
+      "Value": {
+        "Ref": "OnFailureQueue"
+      }
+    },
+    "RecoveryQueueArn": {
+      "Value": {
+        "Fn::GetAtt": [
+          "RecoveryQueue",
+          "Arn"
+        ]
+      }
+    },
+    "RecoveryQueueUrl": {
+      "Value": {
+        "Ref": "RecoveryQueue"
+      }
+    },
+    "RecoveryWorkerFunctionName": {
+      "Value": {
+        "Ref": "RecoveryWorkerFunction"
+      }
+    },
+    "ResyncWorkerFunctionName": {
+      "Value": {
+        "Ref": "ResyncWorkerFunction"
+      }
+    },
+    "RecoveryScheduleName": {
+      "Value": {
+        "Ref": "RecoveryWorkerSchedule"
+      }
+    },
+    "ResyncScheduleName": {
+      "Value": {
+        "Ref": "ResyncWorkerSchedule"
+      }
+    }
+  }
+}

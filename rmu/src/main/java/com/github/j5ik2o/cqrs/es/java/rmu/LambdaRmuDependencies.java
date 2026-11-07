@@ -15,9 +15,12 @@ import org.apache.ibatis.session.SqlSessionFactory;
 import org.apache.ibatis.session.SqlSessionFactoryBuilder;
 import org.apache.ibatis.transaction.jdbc.JdbcTransactionFactory;
 import software.amazon.awssdk.auth.credentials.AwsBasicCredentials;
+import software.amazon.awssdk.auth.credentials.AwsCredentialsProvider;
 import software.amazon.awssdk.auth.credentials.StaticCredentialsProvider;
+import software.amazon.awssdk.awscore.client.builder.AwsClientBuilder;
 import software.amazon.awssdk.regions.Region;
 import software.amazon.awssdk.services.dynamodb.DynamoDbClient;
+import software.amazon.awssdk.services.sqs.SqsClient;
 
 /**
  * Builds the RMU dependencies for the AWS Lambda entry point.
@@ -29,7 +32,11 @@ import software.amazon.awssdk.services.dynamodb.DynamoDbClient;
 public final class LambdaRmuDependencies {
 
   public record Dependencies(
-      EventApplier applier, RecoveryService recoveryService, RetryPolicy retryPolicy) {}
+      EventApplier applier,
+      RecoveryService recoveryService,
+      RetryPolicy retryPolicy,
+      Resyncer resyncer,
+      int maxRecoveryTasksPerRun) {}
 
   private LambdaRmuDependencies() {}
 
@@ -54,28 +61,85 @@ public final class LambdaRmuDependencies {
         new Applier(
             sqlSessionFactory, journalReader, intEnv("APP_STREAM_MAX_EVENTS_PER_TRANSACTION", 1));
     var taskStore = new MyBatisRecoveryTaskStore(sqlSessionFactory);
-    var recoveryService = new RecoveryService(taskStore, headScanner, applier, null);
-    return new Dependencies(applier, recoveryService, retryPolicy);
+    var recoveryService =
+        new RecoveryService(taskStore, headScanner, applier, createRecoveryNotifier());
+    var resyncer = new Resyncer(applier, headScanner, recoveryService);
+    return new Dependencies(
+        applier,
+        recoveryService,
+        retryPolicy,
+        resyncer,
+        positiveIntEnv("APP_RECOVERY_MAX_TASKS_PER_RUN", 50));
+  }
+
+  /**
+   * The RMU sends a wake-up message to the recovery queue after a task is durably recorded. Without
+   * a queue URL the notifier is absent and the recovery worker is driven another way.
+   */
+  private static RecoveryNotifier createRecoveryNotifier() {
+    var queueUrl = env("APP_RECOVERY_QUEUE_URL", null);
+    if (queueUrl == null) {
+      return null;
+    }
+    return new SqsRecoveryNotifier(createSqsClient(), queueUrl);
+  }
+
+  private static SqsClient createSqsClient() {
+    var builder = SqsClient.builder();
+    applyClientConfig(
+        builder,
+        "APP_RECOVERY_SQS_REGION",
+        "APP_RECOVERY_SQS_ENDPOINT_URL",
+        "APP_RECOVERY_SQS_ACCESS_KEY_ID",
+        "APP_RECOVERY_SQS_SECRET_ACCESS_KEY");
+    return builder.build();
   }
 
   private static DynamoDbClient createDynamoDbClient() {
-    var region = env("APP_DYNAMO_DB_REGION", env("AWS_REGION", null));
-    if (region == null) {
-      return DynamoDbClient.create();
-    }
-    var builder = DynamoDbClient.builder().region(Region.of(region));
-    var endpoint = env("APP_DYNAMO_DB_ENDPOINT_URL", null);
-    if (endpoint != null) {
-      builder = builder.endpointOverride(URI.create(endpoint));
-    }
-    var accessKey = env("APP_DYNAMO_DB_ACCESS_KEY_ID", null);
-    var secretKey = env("APP_DYNAMO_DB_SECRET_ACCESS_KEY", null);
-    if (accessKey != null && secretKey != null) {
-      builder =
-          builder.credentialsProvider(
-              StaticCredentialsProvider.create(AwsBasicCredentials.create(accessKey, secretKey)));
-    }
+    var builder = DynamoDbClient.builder();
+    applyClientConfig(
+        builder,
+        "APP_DYNAMO_DB_REGION",
+        "APP_DYNAMO_DB_ENDPOINT_URL",
+        "APP_DYNAMO_DB_ACCESS_KEY_ID",
+        "APP_DYNAMO_DB_SECRET_ACCESS_KEY");
     return builder.build();
+  }
+
+  /**
+   * Applies the region, endpoint, and static credentials of one client. The SQS settings are
+   * separate from the DynamoDB ones so a custom DynamoDB endpoint is not sent SQS requests. Unset
+   * values are left for the SDK's default provider chain, which is what a Lambda execution role
+   * uses.
+   */
+  private static <B extends AwsClientBuilder<B, ?>> void applyClientConfig(
+      B builder,
+      String regionName,
+      String endpointName,
+      String accessKeyName,
+      String secretKeyName) {
+    var region = env(regionName, env("AWS_REGION", null));
+    if (region != null) {
+      builder.region(Region.of(region));
+    }
+    var endpoint = env(endpointName, null);
+    if (endpoint != null) {
+      builder.endpointOverride(URI.create(endpoint));
+    }
+    var credentials = staticCredentials(accessKeyName, secretKeyName);
+    if (credentials != null) {
+      builder.credentialsProvider(credentials);
+    }
+  }
+
+  private static AwsCredentialsProvider staticCredentials(
+      String accessKeyName, String secretKeyName) {
+    var accessKey = env(accessKeyName, null);
+    var secretKey = env(secretKeyName, null);
+    if (accessKey == null || secretKey == null) {
+      return null;
+    }
+    return StaticCredentialsProvider.create(AwsBasicCredentials.create(accessKey, secretKey));
   }
 
   private static SqlSessionFactory createSqlSessionFactory() {
@@ -104,6 +168,14 @@ public final class LambdaRmuDependencies {
   private static int intEnv(String name, int fallback) {
     var value = env(name, null);
     return value == null ? fallback : Integer.parseInt(value);
+  }
+
+  private static int positiveIntEnv(String name, int fallback) {
+    var value = intEnv(name, fallback);
+    if (value <= 0) {
+      throw new IllegalStateException(name + " must be a positive integer");
+    }
+    return value;
   }
 
   private static long longEnv(String name, long fallback) {
