@@ -39,7 +39,7 @@ Read Model Updater（RMU）は head テーブルの Streams を購読して MySQ
 
 主キーは `(store_id, projection_name, aggregate_id, seq_nr)` である。同じレコードが再配信されても、既存の `pending` 行を更新するだけで重複しない。
 
-SQS は復旧ワーカーを起こすためだけに使い、イベント本文は運ばない。復旧処理は必ず journal から本文を読み直す。これにより、head の payload が壊れていても journal が正しければ復旧できる。Lambda の `OnFailure` 通知は、復旧タスクの記録自体に失敗した場合の安全網として残す。
+SQS を使う場合は、復旧ワーカーを起こすためだけに使い、イベント本文は運ばない。復旧処理は必ず journal から本文を読み直す。これにより、head の payload が壊れていても journal が正しければ復旧できる。Lambda の `OnFailure` 通知は、復旧タスクの記録自体に失敗した場合の安全網として残す。
 
 復旧は次の順で行う。
 

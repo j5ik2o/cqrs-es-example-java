@@ -39,7 +39,7 @@ A failed event is stored in `read_model_recovery_tasks` by identifier only; the 
 
 The primary key is `(store_id, projection_name, aggregate_id, seq_nr)`, so a redelivered record updates the pending task instead of creating a duplicate.
 
-SQS is only used to wake a recovery worker; the event body is always re-read from the journal. This lets recovery succeed when the head payload is damaged but the journal entry is intact. The Lambda `OnFailure` destination stays as the safety net for a failure to record the task itself.
+If SQS is used, it only wakes a recovery worker; the event body is always re-read from the journal. This lets recovery succeed when the head payload is damaged but the journal entry is intact. The Lambda `OnFailure` destination stays as the safety net for a failure to record the task itself.
 
 Recovery replays a task in this order.
 
