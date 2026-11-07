@@ -86,6 +86,12 @@ class RmuDeploymentTemplateTest {
                 "/Resources/RmuFunction/Properties/Environment/Variables/APP_RECOVERY_QUEUE_URL/Ref")
             .asText());
     assertEquals(
+        "RecoveryQueue",
+        template
+            .at(
+                "/Resources/ResyncWorkerFunction/Properties/Environment/Variables/APP_RECOVERY_QUEUE_URL/Ref")
+            .asText());
+    assertEquals(
         REPORT_BATCH_ITEM_FAILURES,
         template
             .at("/Resources/RecoveryWorkerEventSourceMapping/Properties/FunctionResponseTypes/0")
@@ -102,6 +108,33 @@ class RmuDeploymentTemplateTest {
         "/Resources/RecoveryWorkerFunction/Properties/Handler",
         RecoveryWorker.class,
         SQSEvent.class);
+    assertHandler(
+        "/Resources/ResyncWorkerFunction/Properties/Handler", ResyncWorker.class, Object.class);
+  }
+
+  @Test
+  void schedulesPeriodicRecoveryAndResync() {
+    var template = template();
+
+    assertEquals(
+        "RecoveryWorkerFunction",
+        template
+            .at("/Resources/RecoveryWorkerSchedule/Properties/Targets/0/Arn/Fn::GetAtt/0")
+            .asText());
+    assertEquals(
+        "ResyncWorkerFunction",
+        template
+            .at("/Resources/ResyncWorkerSchedule/Properties/Targets/0/Arn/Fn::GetAtt/0")
+            .asText());
+    assertEquals(
+        "ENABLED", template.at("/Resources/RecoveryWorkerSchedule/Properties/State").asText());
+    assertEquals(
+        "ENABLED", template.at("/Resources/ResyncWorkerSchedule/Properties/State").asText());
+  }
+
+  @Test
+  void keepsTheRecoveryTaskBudgetPositive() {
+    assertTrue(template().at("/Parameters/RecoveryMaxTasksPerRun/MinValue").asInt() >= 1);
   }
 
   @Test

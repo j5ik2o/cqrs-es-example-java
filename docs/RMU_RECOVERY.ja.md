@@ -96,13 +96,17 @@ AWS にデプロイするための CloudFormation テンプレートを `deploy/
 
 ハンドラは `com.github.j5ik2o.cqrs.es.java.rmu.ReadModelUpdater::handleRequest` である。引数なしのコンストラクターが環境変数から依存関係を組み立てるため、Lambda はハンドラを直接生成できる。必要な環境変数は `APP_STREAM_HEAD_TABLE_NAME`、`APP_STREAM_JOURNAL_TABLE_NAME`、`APP_STREAM_MAX_EVENTS_PER_TRANSACTION`、`APP_STREAM_RETRY_*`、`APP_DYNAMO_DB_*`（または `AWS_REGION`）、`SPRING_DATASOURCE_URL`、`SPRING_DATASOURCE_USERNAME`、`SPRING_DATASOURCE_PASSWORD` である。MySQL の JDBC ドライバーを Lambda のクラスパスに入れること。
 
-部分バッチ応答の `itemIdentifier` には、DynamoDB Streams の仕様に合わせてレコードのシーケンス番号を入れる。復旧タスクに記録できた失敗は再配信しない。記録に失敗した場合だけ再配信する。同じ集約で先に失敗したレコードがある間は、後続のレコードも再配信対象にする。位置より先へ進めないためである。
+部分バッチ応答の `itemIdentifier` には、DynamoDB Streams の仕様に合わせてレコードのシーケンス番号を入れる。Lambda は返された失敗のうち最小のシーケンス番号から再開するため、失敗したレコードより後ろの正常なレコードも再配信されることがある。位置ガードが重複を捨てるため、結果は変わらない。復旧タスクに記録できた失敗はバッチの失敗として返さない。記録に失敗した場合だけ返す。同じ集約で先に失敗したレコードがある間は、後続のレコードも返す。位置より先へ進めないためである。シーケンス番号がないレコードは、そのレコードだけを捨てずに呼び出し全体を失敗させ、Lambda にバッチを再試行させる。
 
 ## 復旧ワーカー
 
-`com.github.j5ik2o.cqrs.es.java.rmu.RecoveryWorker::handleRequest` は SQS のエントリーポイントである。メッセージ 1 件で復旧を 1 回実行し、本文は使わない。ワーカーは `RecoveryService.recoverPending(maxTasks)` を呼び、未処理タスクが残ったときはメッセージをバッチの失敗として返す。SQS はこれを再配信し、キューの再試行上限に達したメッセージは DLQ へ移る。
+`com.github.j5ik2o.cqrs.es.java.rmu.RecoveryWorker::handleRequest` は SQS のエントリーポイントである。メッセージ 1 件で復旧を 1 回実行し、本文は使わない。ワーカーは `RecoveryService.recoverPending(maxTasks)` を上限付きで最大 10 バッチ呼ぶ。`maxTasks` を超える滞留も 1 回の起動で進む。上限に達したとき、または未処理タスクが残ったときは、メッセージをバッチの失敗として返す。SQS はこれを再配信し、キューの再試行上限に達したメッセージは DLQ へ移る。
 
-`LambdaRmuDependencies` は `APP_RECOVERY_QUEUE_URL` が設定されているとき `SqsRecoveryNotifier` を組み立てる。RMU は復旧タスクを記録したあと、識別子だけを含む起動メッセージを送る。復旧キューのイベントソースマッピングは `BatchSize = 1` と `ReportBatchItemFailures` を使う。バッチ待ちで復旧の起動が遅れないようにするためである。
+`LambdaRmuDependencies` は `APP_RECOVERY_QUEUE_URL` が設定されているとき `SqsRecoveryNotifier` を組み立てる。RMU は復旧タスクを記録したあと、識別子だけを含む起動メッセージを送る。復旧キューのイベントソースマッピングは `BatchSize = 1` と `ReportBatchItemFailures` を使う。バッチ待ちで復旧の起動が遅れないようにするためである。通知が失われても未処理タスクを処理できるよう、EventBridge の定期実行（既定 5 分ごと）が復旧ワーカーを呼ぶ。
+
+## 再同期ワーカー
+
+Lambda はローカルの reader のような起動時 Scan を行わない。`com.github.j5ik2o.cqrs.es.java.rmu.ResyncWorker::handleRequest` は head テーブルを全件 Scan し、journal から遅れを埋める。適用の位置ガードはストリーム経路と同じである。EventBridge の定期実行（既定 1 日ごと）が呼び、デプロイ後や Streams の保持期間を超えた停止のあとには、運用者が手動で実行する。テンプレートは再同期ワーカーにも `APP_RECOVERY_QUEUE_URL` を渡すため、適用できない集約は復旧タスクとして記録され、復旧ワーカーが起動する。
 
 ## ローカルの設定
 
@@ -139,14 +143,16 @@ app:
 
 デプロイ資産にもテストを置いた。
 
-- `RmuDeploymentTemplateTest` は `BisectBatchOnFunctionError`、`ReportBatchItemFailures`、OnFailure の送信先、再試行回数、関数のタイムアウト、復旧キューの可視性タイムアウト、両方の DLQ、ハンドラ名、環境変数の再試行既定値を確認する。
-- `ReadModelUpdaterHandlerTest` は部分バッチ応答を確認する。失敗した集約の後続レコードだけを再配信し、復旧タスクの記録に失敗したレコードを再配信し、対象外のレコードでは失敗を返さず、シーケンス番号がないときはイベント ID を使う。
-- `RecoveryWorkerTest` は、成功した実行が全メッセージを削除し、失敗した実行が全メッセージを再配信することを確認する。
+- `RmuDeploymentTemplateTest` は `BisectBatchOnFunctionError`、`ReportBatchItemFailures`、OnFailure の送信先、再試行回数、関数のタイムアウト、復旧キューの可視性タイムアウト、両方の DLQ、ハンドラ名、復旧と再同期の定期実行、復旧件数の下限、環境変数の再試行既定値を確認する。
+- `ReadModelUpdaterHandlerTest` は部分バッチ応答を確認する。失敗した集約の後続レコードを返し、復旧タスクの記録に失敗したレコードを返し、対象外のレコードでは失敗を返さず、シーケンス番号がないときは呼び出し全体を失敗させる。
+- `RecoveryWorkerTest` は、成功した実行が全メッセージを削除し、失敗した実行が全メッセージを再配信し、1 バッチを超える滞留を処理し、上限に達したら再配信することを確認する。
 - `SqsRecoveryNotifierTest` は、起動メッセージが識別子だけを含むことを確認する。
+- `RecoveryNotifierTest` は、復旧タスクの記録後に通知し、通知に失敗してもタスクを残すことを確認する。
+- `ResyncWorkerTest` は、再同期ワーカーが `heads`、`skipped`、`advanced`、`failed` の件数を返すことを確認する。
 
 ## 残課題
 
-- RMU と復旧ワーカーの Lambda 配布物（両方のハンドラと依存ライブラリを含む）は、このリポジトリではまだ作らない。テンプレートは配布物の S3 の場所をパラメータで受け取る。
+- RMU、復旧ワーカー、再同期ワーカーの Lambda 配布物（3 つのハンドラと依存ライブラリを含む ZIP または JAR）は、このリポジトリではまだ作らない。テンプレートは配布物の S3 の場所をパラメータで受け取る。
 - MySQL の認証情報はテンプレートの引数で渡している。本番では Secrets Manager か SSM Parameter Store から読む。
 - スタックはまだ AWS にデプロイしていない。CI はテンプレートの検証と `RmuDeploymentTemplateTest` の実行だけを行い、AWS は呼ばない。
 - e2e は正常系と再起動の再生を確認する。失敗の注入はユニットテストで確認している。

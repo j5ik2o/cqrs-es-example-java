@@ -18,6 +18,9 @@ import org.slf4j.LoggerFactory;
  */
 public final class RecoveryWorker {
   private static final Logger LOGGER = LoggerFactory.getLogger(RecoveryWorker.class);
+  // A single message may wake a large backlog. Drain it in bounded batches, then let SQS
+  // redeliver if the safety cap is reached.
+  private static final int MAX_BATCHES_PER_RUN = 10;
 
   private final RecoveryService recoveryService;
   private final int maxTasksPerRun;
@@ -35,20 +38,40 @@ public final class RecoveryWorker {
   }
 
   public SQSBatchResponse handleRequest(SQSEvent event, Context context) {
+    RecoveryRun run;
     try {
-      var completed = recoveryService.recoverPending(maxTasksPerRun);
-      LOGGER.info("Recovery run completed {} pending tasks", completed);
-      return new SQSBatchResponse(List.of());
+      run = recoverAllBatches();
     } catch (RuntimeException e) {
-      var failures = redeliverAll(event);
-      if (failures.isEmpty()) {
-        // A manual invocation has no SQS message to redeliver, so the caller must see the
-        // failure instead of a successful response.
-        throw e;
-      }
-      LOGGER.error("Recovery run failed; the messages will be redelivered", e);
-      return new SQSBatchResponse(failures);
+      return failureResponse(event, e);
     }
+    LOGGER.info("Recovery run completed {} pending tasks", run.completed());
+    if (!run.capped()) {
+      return new SQSBatchResponse(List.of());
+    }
+    return failureResponse(event, new RecoveryException("recovery run reached the batch cap"));
+  }
+
+  private RecoveryRun recoverAllBatches() {
+    var total = 0;
+    for (var batch = 0; batch < MAX_BATCHES_PER_RUN; batch++) {
+      var completed = recoveryService.recoverPending(maxTasksPerRun);
+      total += completed;
+      if (completed < maxTasksPerRun) {
+        return new RecoveryRun(total, false);
+      }
+    }
+    return new RecoveryRun(total, true);
+  }
+
+  private static SQSBatchResponse failureResponse(SQSEvent event, RuntimeException failure) {
+    var failures = redeliverAll(event);
+    if (failures.isEmpty()) {
+      // A manual invocation has no SQS message to redeliver, so the caller must see the failure
+      // instead of a successful response.
+      throw failure;
+    }
+    LOGGER.error("Recovery run failed; the messages will be redelivered", failure);
+    return new SQSBatchResponse(failures);
   }
 
   private static List<SQSBatchResponse.BatchItemFailure> redeliverAll(SQSEvent event) {
@@ -61,4 +84,6 @@ public final class RecoveryWorker {
         .map(SQSBatchResponse.BatchItemFailure::new)
         .toList();
   }
+
+  private record RecoveryRun(int completed, boolean capped) {}
 }

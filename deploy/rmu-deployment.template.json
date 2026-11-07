@@ -67,6 +67,23 @@
       "MinValue": 30,
       "MaxValue": 900
     },
+    "ResyncWorkerTimeoutSeconds": {
+      "Type": "Number",
+      "Default": 900,
+      "MinValue": 30,
+      "MaxValue": 900,
+      "Description": "The resync worker scans every head, so it gets the Lambda maximum by default."
+    },
+    "RecoveryScheduleExpression": {
+      "Type": "String",
+      "Default": "rate(5 minutes)",
+      "Description": "EventBridge schedule for the recovery worker. It drains pending tasks even when no SQS notification arrives."
+    },
+    "ResyncScheduleExpression": {
+      "Type": "String",
+      "Default": "rate(1 day)",
+      "Description": "EventBridge schedule for the full head resync."
+    },
     "RmuBatchSize": {
       "Type": "Number",
       "Default": 100,
@@ -108,7 +125,8 @@
     },
     "RecoveryMaxTasksPerRun": {
       "Type": "Number",
-      "Default": 50
+      "Default": 50,
+      "MinValue": 1
     },
     "RecoveryQueueVisibilityTimeoutSeconds": {
       "Type": "Number",
@@ -563,6 +581,219 @@
           "ReportBatchItemFailures"
         ]
       }
+    },
+    "RecoveryWorkerSchedule": {
+      "Type": "AWS::Events::Rule",
+      "Properties": {
+        "Name": {
+          "Fn::Sub": "${AWS::StackName}-rmu-recovery-schedule"
+        },
+        "Description": "Drains pending recovery tasks even when no SQS notification arrives.",
+        "ScheduleExpression": {
+          "Ref": "RecoveryScheduleExpression"
+        },
+        "State": "ENABLED",
+        "Targets": [
+          {
+            "Arn": {
+              "Fn::GetAtt": [
+                "RecoveryWorkerFunction",
+                "Arn"
+              ]
+            },
+            "Id": "recovery-worker"
+          }
+        ]
+      }
+    },
+    "RecoveryWorkerSchedulePermission": {
+      "Type": "AWS::Lambda::Permission",
+      "Properties": {
+        "Action": "lambda:InvokeFunction",
+        "FunctionName": {
+          "Ref": "RecoveryWorkerFunction"
+        },
+        "Principal": "events.amazonaws.com",
+        "SourceArn": {
+          "Fn::GetAtt": [
+            "RecoveryWorkerSchedule",
+            "Arn"
+          ]
+        }
+      }
+    },
+    "ResyncWorkerFunctionRole": {
+      "Type": "AWS::IAM::Role",
+      "Properties": {
+        "AssumeRolePolicyDocument": {
+          "Version": "2012-10-17",
+          "Statement": [
+            {
+              "Effect": "Allow",
+              "Principal": {
+                "Service": "lambda.amazonaws.com"
+              },
+              "Action": "sts:AssumeRole"
+            }
+          ]
+        },
+        "ManagedPolicyArns": [
+          {
+            "Fn::Sub": "arn:${AWS::Partition}:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole"
+          },
+          {
+            "Fn::Sub": "arn:${AWS::Partition}:iam::aws:policy/service-role/AWSLambdaVPCAccessExecutionRole"
+          }
+        ],
+        "Policies": [
+          {
+            "PolicyName": "rmu-resync-worker-tables-and-queue",
+            "PolicyDocument": {
+              "Version": "2012-10-17",
+              "Statement": [
+                {
+                  "Sid": "ReadHeadAndJournalTables",
+                  "Effect": "Allow",
+                  "Action": [
+                    "dynamodb:GetItem",
+                    "dynamodb:BatchGetItem",
+                    "dynamodb:Query",
+                    "dynamodb:Scan"
+                  ],
+                  "Resource": [
+                    {
+                      "Fn::Sub": "arn:${AWS::Partition}:dynamodb:${AWS::Region}:${AWS::AccountId}:table/${HeadTableName}"
+                    },
+                    {
+                      "Fn::Sub": "arn:${AWS::Partition}:dynamodb:${AWS::Region}:${AWS::AccountId}:table/${JournalTableName}"
+                    }
+                  ]
+                },
+                {
+                  "Sid": "SendRecoveryMessages",
+                  "Effect": "Allow",
+                  "Action": "sqs:SendMessage",
+                  "Resource": {
+                    "Fn::GetAtt": [
+                      "RecoveryQueue",
+                      "Arn"
+                    ]
+                  }
+                }
+              ]
+            }
+          }
+        ]
+      }
+    },
+    "ResyncWorkerFunction": {
+      "Type": "AWS::Lambda::Function",
+      "Properties": {
+        "FunctionName": {
+          "Fn::Sub": "${AWS::StackName}-rmu-resync-worker"
+        },
+        "Runtime": "java17",
+        "Handler": "com.github.j5ik2o.cqrs.es.java.rmu.ResyncWorker::handleRequest",
+        "Code": {
+          "S3Bucket": {
+            "Ref": "CodeS3Bucket"
+          },
+          "S3Key": {
+            "Ref": "CodeS3Key"
+          }
+        },
+        "Timeout": {
+          "Ref": "ResyncWorkerTimeoutSeconds"
+        },
+        "MemorySize": 1024,
+        "Role": {
+          "Fn::GetAtt": [
+            "ResyncWorkerFunctionRole",
+            "Arn"
+          ]
+        },
+        "VpcConfig": {
+          "Fn::If": [
+            "UsesVpc",
+            {
+              "SubnetIds": {
+                "Ref": "SubnetIds"
+              },
+              "SecurityGroupIds": {
+                "Ref": "SecurityGroupIds"
+              }
+            },
+            {
+              "Ref": "AWS::NoValue"
+            }
+          ]
+        },
+        "Environment": {
+          "Variables": {
+            "APP_STREAM_HEAD_TABLE_NAME": {
+              "Ref": "HeadTableName"
+            },
+            "APP_STREAM_JOURNAL_TABLE_NAME": {
+              "Ref": "JournalTableName"
+            },
+            "APP_RECOVERY_QUEUE_URL": {
+              "Ref": "RecoveryQueue"
+            },
+            "APP_RECOVERY_MAX_TASKS_PER_RUN": {
+              "Fn::Sub": "${RecoveryMaxTasksPerRun}"
+            },
+            "SPRING_DATASOURCE_URL": {
+              "Ref": "DataSourceUrl"
+            },
+            "SPRING_DATASOURCE_USERNAME": {
+              "Ref": "DataSourceUsername"
+            },
+            "SPRING_DATASOURCE_PASSWORD": {
+              "Ref": "DataSourcePassword"
+            }
+          }
+        }
+      }
+    },
+    "ResyncWorkerSchedule": {
+      "Type": "AWS::Events::Rule",
+      "Properties": {
+        "Name": {
+          "Fn::Sub": "${AWS::StackName}-rmu-resync-schedule"
+        },
+        "Description": "Rebuilds lag from the journal after a long stream outage or a deployment.",
+        "ScheduleExpression": {
+          "Ref": "ResyncScheduleExpression"
+        },
+        "State": "ENABLED",
+        "Targets": [
+          {
+            "Arn": {
+              "Fn::GetAtt": [
+                "ResyncWorkerFunction",
+                "Arn"
+              ]
+            },
+            "Id": "resync-worker"
+          }
+        ]
+      }
+    },
+    "ResyncWorkerSchedulePermission": {
+      "Type": "AWS::Lambda::Permission",
+      "Properties": {
+        "Action": "lambda:InvokeFunction",
+        "FunctionName": {
+          "Ref": "ResyncWorkerFunction"
+        },
+        "Principal": "events.amazonaws.com",
+        "SourceArn": {
+          "Fn::GetAtt": [
+            "ResyncWorkerSchedule",
+            "Arn"
+          ]
+        }
+      }
     }
   },
   "Outputs": {
@@ -613,6 +844,21 @@
     "RecoveryWorkerFunctionName": {
       "Value": {
         "Ref": "RecoveryWorkerFunction"
+      }
+    },
+    "ResyncWorkerFunctionName": {
+      "Value": {
+        "Ref": "ResyncWorkerFunction"
+      }
+    },
+    "RecoveryScheduleName": {
+      "Value": {
+        "Ref": "RecoveryWorkerSchedule"
+      }
+    },
+    "ResyncScheduleName": {
+      "Value": {
+        "Ref": "ResyncWorkerSchedule"
       }
     }
   }

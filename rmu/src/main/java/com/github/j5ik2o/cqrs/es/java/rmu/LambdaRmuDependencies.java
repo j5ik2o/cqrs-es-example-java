@@ -35,6 +35,7 @@ public final class LambdaRmuDependencies {
       EventApplier applier,
       RecoveryService recoveryService,
       RetryPolicy retryPolicy,
+      Resyncer resyncer,
       int maxRecoveryTasksPerRun) {}
 
   private LambdaRmuDependencies() {}
@@ -62,8 +63,13 @@ public final class LambdaRmuDependencies {
     var taskStore = new MyBatisRecoveryTaskStore(sqlSessionFactory);
     var recoveryService =
         new RecoveryService(taskStore, headScanner, applier, createRecoveryNotifier());
+    var resyncer = new Resyncer(applier, headScanner, recoveryService);
     return new Dependencies(
-        applier, recoveryService, retryPolicy, intEnv("APP_RECOVERY_MAX_TASKS_PER_RUN", 50));
+        applier,
+        recoveryService,
+        retryPolicy,
+        resyncer,
+        positiveIntEnv("APP_RECOVERY_MAX_TASKS_PER_RUN", 50));
   }
 
   /**
@@ -80,38 +86,56 @@ public final class LambdaRmuDependencies {
 
   private static SqsClient createSqsClient() {
     var builder = SqsClient.builder();
-    applyCommonConfig(builder);
+    applyClientConfig(
+        builder,
+        "APP_RECOVERY_SQS_REGION",
+        "APP_RECOVERY_SQS_ENDPOINT_URL",
+        "APP_RECOVERY_SQS_ACCESS_KEY_ID",
+        "APP_RECOVERY_SQS_SECRET_ACCESS_KEY");
     return builder.build();
   }
 
   private static DynamoDbClient createDynamoDbClient() {
     var builder = DynamoDbClient.builder();
-    applyCommonConfig(builder);
+    applyClientConfig(
+        builder,
+        "APP_DYNAMO_DB_REGION",
+        "APP_DYNAMO_DB_ENDPOINT_URL",
+        "APP_DYNAMO_DB_ACCESS_KEY_ID",
+        "APP_DYNAMO_DB_SECRET_ACCESS_KEY");
     return builder.build();
   }
 
   /**
-   * Applies the shared region, endpoint, and static credentials. Unset values are left for the
-   * SDK's default provider chain, which is what a Lambda execution role uses.
+   * Applies the region, endpoint, and static credentials of one client. The SQS settings are
+   * separate from the DynamoDB ones so a custom DynamoDB endpoint is not sent SQS requests. Unset
+   * values are left for the SDK's default provider chain, which is what a Lambda execution role
+   * uses.
    */
-  private static <B extends AwsClientBuilder<B, ?>> void applyCommonConfig(B builder) {
-    var region = env("APP_DYNAMO_DB_REGION", env("AWS_REGION", null));
+  private static <B extends AwsClientBuilder<B, ?>> void applyClientConfig(
+      B builder,
+      String regionName,
+      String endpointName,
+      String accessKeyName,
+      String secretKeyName) {
+    var region = env(regionName, env("AWS_REGION", null));
     if (region != null) {
       builder.region(Region.of(region));
     }
-    var endpoint = env("APP_DYNAMO_DB_ENDPOINT_URL", null);
+    var endpoint = env(endpointName, null);
     if (endpoint != null) {
       builder.endpointOverride(URI.create(endpoint));
     }
-    var credentials = staticCredentials();
+    var credentials = staticCredentials(accessKeyName, secretKeyName);
     if (credentials != null) {
       builder.credentialsProvider(credentials);
     }
   }
 
-  private static AwsCredentialsProvider staticCredentials() {
-    var accessKey = env("APP_DYNAMO_DB_ACCESS_KEY_ID", null);
-    var secretKey = env("APP_DYNAMO_DB_SECRET_ACCESS_KEY", null);
+  private static AwsCredentialsProvider staticCredentials(
+      String accessKeyName, String secretKeyName) {
+    var accessKey = env(accessKeyName, null);
+    var secretKey = env(secretKeyName, null);
     if (accessKey == null || secretKey == null) {
       return null;
     }
@@ -144,6 +168,14 @@ public final class LambdaRmuDependencies {
   private static int intEnv(String name, int fallback) {
     var value = env(name, null);
     return value == null ? fallback : Integer.parseInt(value);
+  }
+
+  private static int positiveIntEnv(String name, int fallback) {
+    var value = intEnv(name, fallback);
+    if (value <= 0) {
+      throw new IllegalStateException(name + " must be a positive integer");
+    }
+    return value;
   }
 
   private static long longEnv(String name, long fallback) {

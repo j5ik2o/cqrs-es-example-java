@@ -19,8 +19,8 @@ Options:
                           this flag the script only validates the template.
   --stack-name <name>     Stack name. Defaults to $RMU_STACK_NAME or
                           cqrs-es-example-rmu.
-  --parameters <file>     JSON file of CloudFormation parameter values. See
-                          parameters.example.json.
+  --parameters <file>     JSON file in the AWS CLI --parameter-overrides format.
+                          See parameters.example.json.
   -h, --help              Show this help.
 
 The AWS CLI must be configured with credentials for the target account.
@@ -60,8 +60,14 @@ fi
 
 if command -v jq >/dev/null 2>&1; then
   jq empty "$TEMPLATE"
+  if [[ -n "$PARAMETERS_FILE" ]]; then
+    jq empty "$PARAMETERS_FILE"
+  fi
 else
   python3 -m json.tool "$TEMPLATE" >/dev/null
+  if [[ -n "$PARAMETERS_FILE" ]]; then
+    python3 -m json.tool "$PARAMETERS_FILE" >/dev/null
+  fi
 fi
 echo "template syntax is valid: $TEMPLATE"
 
@@ -85,26 +91,10 @@ args=(
 )
 
 if [[ -n "$PARAMETERS_FILE" ]]; then
-  overrides=()
-  while IFS= read -r line; do
-    overrides+=("$line")
-  done < <(
-    if command -v jq >/dev/null 2>&1; then
-      jq -r 'to_entries[] | select(.value != "") | "\(.key)=\(.value)"' "$PARAMETERS_FILE"
-    else
-      python3 -I -c '
-import json
-import sys
-
-with open(sys.argv[1], encoding="utf-8") as handle:
-    parameters = json.load(handle)
-for key, value in parameters.items():
-    if value != "":
-        print(f"{key}={value}")
-' "$PARAMETERS_FILE"
-    fi
-  )
-  args+=(--parameter-overrides "${overrides[@]}")
+  # The AWS CLI reads the ParameterKey/ParameterValue JSON list directly. An empty value is passed
+  # as an explicit empty string, so an existing stack can reset a parameter instead of keeping its
+  # previous value.
+  args+=(--parameter-overrides "file://${PARAMETERS_FILE}")
 fi
 
 aws cloudformation "${args[@]}"

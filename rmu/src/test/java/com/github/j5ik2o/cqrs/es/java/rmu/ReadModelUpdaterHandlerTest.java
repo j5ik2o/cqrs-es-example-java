@@ -1,6 +1,7 @@
 package com.github.j5ik2o.cqrs.es.java.rmu;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import com.amazonaws.services.lambda.runtime.events.DynamodbEvent;
@@ -110,25 +111,18 @@ class ReadModelUpdaterHandlerTest {
   }
 
   @Test
-  void fallsBackToTheEventIdWhenTheSequenceNumberIsMissing() {
+  void failsTheBatchWhenASequenceNumberIsMissing() {
     var aggregate = "GroupChat-01H42K4ABWQ5V2XQEP3A48VE0H";
     var applier = new RejectingApplier(aggregate);
     var recovery =
         new RecoveryService(
             new FailingRecoveryTaskStore(), () -> RmuTestSupport.STORE_ID, applier, null);
     var updater = new ReadModelUpdater(applier, recovery, RetryPolicy.noRetry());
-    var record = record(aggregate, 1, null);
 
     var event = new DynamodbEvent();
-    event.setRecords(List.of(record));
+    event.setRecords(List.of(record(aggregate, 1, null)));
 
-    var response = updater.handleRequest(event, null);
-
-    assertEquals(
-        List.of(record.getEventID()),
-        response.batchItemFailures().stream()
-            .map(DynamodbBatchResponse.BatchItemFailure::itemIdentifier)
-            .toList());
+    assertThrows(PermanentFailure.class, () -> updater.handleRequest(event, null));
   }
 
   private static DynamodbEvent.DynamodbStreamRecord record(
