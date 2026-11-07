@@ -8,6 +8,7 @@ WRITE_API_SERVER_BASE_URL=${WRITE_API_SERVER_BASE_URL:-http://localhost:58080/gr
 READ_API_SERVER_BASE_URL=${READ_API_SERVER_BASE_URL:-http://localhost:58082/graphql}
 POLL_TIMEOUT=${POLL_TIMEOUT:-60}
 POLL_INTERVAL=${POLL_INTERVAL:-1}
+REQUEST_TIMEOUT=${REQUEST_TIMEOUT:-10}
 
 CREATE_GROUP_CHAT='mutation CreateGroupChat($input: CreateGroupChatInput!) { createGroupChat(input: $input) { groupChatId } }'
 ADD_MEMBER='mutation AddMember($input: AddMemberInput!) { addMember(input: $input) { groupChatId } }'
@@ -29,8 +30,23 @@ graphql() {
 	local url=$1
 	local query=$2
 	local variables=${3:-'{}'}
+	local timeout=${4:-$REQUEST_TIMEOUT}
 	jq -cn --arg query "$query" --argjson variables "$variables" '{query: $query, variables: $variables}' |
-		curl -sS --fail-with-body -X POST -H "Content-Type: application/json" "$url" --data-binary @-
+		curl -sS --fail-with-body --connect-timeout "$timeout" --max-time "$timeout" \
+			-X POST -H "Content-Type: application/json" "$url" --data-binary @-
+}
+
+request_timeout_for_deadline() {
+	local deadline=$1
+	local remaining=$((deadline - SECONDS))
+	if [ "$remaining" -lt 1 ]; then
+		remaining=1
+	fi
+	if [ "$remaining" -lt "$REQUEST_TIMEOUT" ]; then
+		printf '%s' "$remaining"
+	else
+		printf '%s' "$REQUEST_TIMEOUT"
+	fi
 }
 
 wait_for_graphql() {
@@ -39,7 +55,9 @@ wait_for_graphql() {
 	local response=""
 	local deadline=$((SECONDS + POLL_TIMEOUT))
 	while [ "$SECONDS" -lt "$deadline" ]; do
-		if response=$(graphql "$url" '{ __typename }' 2>/dev/null) &&
+		local request_timeout
+		request_timeout=$(request_timeout_for_deadline "$deadline")
+		if response=$(graphql "$url" '{ __typename }' '{}' "$request_timeout" 2>/dev/null) &&
 			[ "$(printf '%s' "$response" | jq -r '.data.__typename // empty')" != "" ]; then
 			echo "${name} is ready"
 			return 0
@@ -73,11 +91,16 @@ poll_read() {
 	local response=""
 	local deadline=$((SECONDS + POLL_TIMEOUT))
 	while [ "$SECONDS" -lt "$deadline" ]; do
-		response=$(graphql "$READ_API_SERVER_BASE_URL" "$query" "$variables")
-		if [ "$(printf '%s' "$response" | jq -r "$filter" 2>/dev/null || printf 'false')" = "true" ]; then
-			echo "Read model reflected: ${description}"
-			printf '%s\n' "$response"
-			return 0
+		local request_timeout
+		request_timeout=$(request_timeout_for_deadline "$deadline")
+		if response=$(graphql "$READ_API_SERVER_BASE_URL" "$query" "$variables" "$request_timeout"); then
+			if [ "$(printf '%s' "$response" | jq -r "$filter" 2>/dev/null || printf 'false')" = "true" ]; then
+				echo "Read model reflected: ${description}"
+				printf '%s\n' "$response"
+				return 0
+			fi
+		else
+			response="request failed or timed out"
 		fi
 		sleep "$POLL_INTERVAL"
 	done
@@ -167,7 +190,7 @@ mutate "deleteMessage" "${DELETE_MESSAGE}" \
 	"$(jq -cn --arg groupChatId "${GROUP_CHAT_ID}" --arg messageId "${MESSAGE_ID}" \
 		--arg executorId "${USER_ACCOUNT_ID}" \
 		'{input: {groupChatId: $groupChatId, messageId: $messageId, executorId: $executorId}}')"
-poll_read "message deletion" '.data.getMessages | length == 0' \
+poll_read "message deletion" '(has("errors") | not) and (.data.getMessages == [])' \
 	"${GET_MESSAGES}" "$(variables_for_group_chat "${GROUP_CHAT_ID}" "${USER_ACCOUNT_ID}")"
 
 echo -e "\nRemove Member(${GROUP_CHAT_ID}, ${USER_ACCOUNT_ID}, ${ADMIN_ID}):"
@@ -184,7 +207,7 @@ mutate "deleteGroupChat" "${DELETE_GROUP_CHAT}" \
 		'{input: {groupChatId: $groupChatId, executorId: $executorId}}')"
 poll_read "GroupChat deletion" '.errors[0].extensions.code == "404"' \
 	"${GET_GROUP_CHAT}" "$(variables_for_group_chat "${GROUP_CHAT_ID}" "${ADMIN_ID}")"
-poll_read "GroupChat list after deletion" '.data.getGroupChats | length == 0' \
+poll_read "GroupChat list after deletion" '(has("errors") | not) and (.data.getGroupChats == [])' \
 	"${GET_GROUP_CHATS}" "$(jq -cn --arg userAccountId "${ADMIN_ID}" '{userAccountId: $userAccountId}')"
 
 echo -e "\nEnd-to-end verification succeeded"
