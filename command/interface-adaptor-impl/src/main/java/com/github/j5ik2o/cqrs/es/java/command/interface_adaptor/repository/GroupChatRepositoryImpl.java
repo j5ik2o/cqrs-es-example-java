@@ -7,6 +7,7 @@ import com.github.j5ik2o.event.store.adapter.java.core.EventEnvelope;
 import com.github.j5ik2o.event.store.adapter.java.core.SnapshotEnvelope;
 import io.vavr.collection.Vector;
 import io.vavr.control.Option;
+import java.util.List;
 import java.util.concurrent.CompletableFuture;
 import java.util.function.BiPredicate;
 
@@ -43,18 +44,11 @@ public class GroupChatRepositoryImpl implements GroupChatRepository {
                 return CompletableFuture.completedFuture(Option.none());
               }
               var snapshotOpt = result.get().snapshot();
-              if (snapshotOpt.isEmpty()) {
-                return CompletableFuture.completedFuture(Option.none());
-              }
-              var snapshot = snapshotOpt.get();
+              var since = snapshotOpt.map(snapshot -> snapshot.seqNr() + 1).orElse(1L);
+              var base = snapshotOpt.map(snapshot -> snapshot.aggregate()).orElse(null);
               return eventStore
-                  .getEventsByIdSinceSeqNr(aggregateId, snapshot.seqNr() + 1)
-                  .thenApply(
-                      events ->
-                          Option.some(
-                              GroupChat.replay(
-                                  Vector.ofAll(events).map(EventEnvelope::payload),
-                                  snapshot.aggregate())))
+                  .getEventsByIdSinceSeqNr(aggregateId, since)
+                  .thenApply(events -> replay(events, base))
                   .exceptionallyCompose(
                       e ->
                           CompletableFuture.failedFuture(
@@ -81,6 +75,31 @@ public class GroupChatRepositoryImpl implements GroupChatRepository {
 
   public CompletableFuture<Void> storeEvent(GroupChatEvent event) {
     return eventStore.persistEvent(toEventEnvelope(event));
+  }
+
+  private static Option<GroupChat> replay(
+      List<EventEnvelope<GroupChatEvent>> events, GroupChat base) {
+    if (base != null) {
+      return Option.some(GroupChat.replay(Vector.ofAll(events).map(EventEnvelope::payload), base));
+    }
+    if (events.isEmpty()) {
+      return Option.none();
+    }
+    if (!(events.get(0).payload() instanceof GroupChatEvent.Created created)) {
+      throw new IllegalStateException(
+          "the first event of an aggregate without a snapshot must be Created");
+    }
+    var initial =
+        GroupChat.from(
+            created.aggregateId(),
+            false,
+            created.name(),
+            created.members(),
+            Messages.ofEmpty(),
+            created.sequenceNumber(),
+            1);
+    var rest = Vector.ofAll(events.subList(1, events.size())).map(EventEnvelope::payload);
+    return Option.some(GroupChat.replay(rest, initial));
   }
 
   private static AggregateId toAggregateId(GroupChatId id) {

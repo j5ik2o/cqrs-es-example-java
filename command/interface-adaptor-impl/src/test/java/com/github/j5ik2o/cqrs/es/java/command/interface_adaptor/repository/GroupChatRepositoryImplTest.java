@@ -75,6 +75,15 @@ class GroupChatRepositoryImplTest {
 
       assertTrue(groupChatOpt.isDefined());
       assertEquals(groupChat1, groupChatOpt.get());
+
+      var renamed = groupChat1.rename(GroupChatName.of("test-2"), adminId).get();
+      repository.store(renamed._2, renamed._1).join();
+
+      var renamedOpt = repository.findById(groupChat1.getId()).join();
+
+      assertTrue(renamedOpt.isDefined());
+      assertEquals("test-2", renamedOpt.get().getName().asString());
+      assertEquals(2L, renamedOpt.get().getSequenceNumber());
     }
   }
 }
