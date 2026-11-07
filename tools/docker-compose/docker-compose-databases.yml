@@ -73,6 +73,7 @@ services:
     environment:
       AWS_ACCESS_KEY_ID: x
       AWS_SECRET_ACCESS_KEY: x
+      AWS_REGION: ap-northeast-1
       AWS_DEFAULT_REGION: ap-northeast-1
       DYNAMODB_ENDPOINT: localstack:4566
       JOURNAL_TABLE_NAME: journal

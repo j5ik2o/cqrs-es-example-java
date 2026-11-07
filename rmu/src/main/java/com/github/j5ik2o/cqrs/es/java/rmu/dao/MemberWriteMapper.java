@@ -1,6 +1,11 @@
 package com.github.j5ik2o.cqrs.es.java.rmu.dao;
 
-import org.apache.ibatis.annotations.*;
+import org.apache.ibatis.annotations.Delete;
+import org.apache.ibatis.annotations.Flush;
+import org.apache.ibatis.annotations.Insert;
+import org.apache.ibatis.annotations.Mapper;
+import org.apache.ibatis.annotations.Param;
+import org.apache.ibatis.annotations.Update;
 
 @Mapper
 public interface MemberWriteMapper {
@@ -17,5 +22,6 @@ public interface MemberWriteMapper {
   @Delete(
       "DELETE FROM members WHERE group_chat_id = #{groupChatId} AND user_account_id = #{userAccountId}")
   @Flush
-  int deleteMember(String groupChatId, String userAccountId);
+  int deleteMember(
+      @Param("groupChatId") String groupChatId, @Param("userAccountId") String userAccountId);
 }

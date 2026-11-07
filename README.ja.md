@@ -35,10 +35,12 @@ Please refer to [here](https://github.com/j5ik2o/cqrs-es-example) for implementa
     - API is implemented by GraphQL (Mutation)
     - Event Sourced Aggregate is implemented by [j5ik2o/event-store-adapter-java](https://github.com/j5ik2o/event-store-adapter-java)
 - Read Model Updater
-    - Lambda to build read models based on journals
-    - Locally, run code that emulates Lambda behavior (local-rmu)
+    - headテーブルのDynamoDB Streamsに基づいてリードモデルを構築する
+    - ローカルで、Lambdaの動作をエミュレートするコードを実行する(local-rmu)
 - Read API Server
     - API is implemented by GraphQL (Query)
+
+ローカルのRead Model UpdaterはheadテーブルのStreamsを購読する。重複した`seq_nr`と古い`seq_nr`は捨て、欠番はジャーナルから補う。処理済みの位置は、リードモデルの更新と同じデータベーストランザクションで`read_model_positions`に記録する。
 
 ### System Architecture Diagram
 

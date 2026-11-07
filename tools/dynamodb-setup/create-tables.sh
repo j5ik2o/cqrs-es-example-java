@@ -16,7 +16,7 @@ while getopts e: OPT; do
   esac
 done
 
-export AWS_DEFAULT_REGION=$AWS_REGION
+export AWS_DEFAULT_REGION=${AWS_REGION:-${AWS_DEFAULT_REGION}}
 export AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID:-x}
 export AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY:-x}
 export AWS_PAGER=""
@@ -40,8 +40,8 @@ if [ "${ENV_NAME}" = "dev" ]; then
   ENDPOINT_URL_OPTION=" --endpoint-url http://${DYNAMODB_ENDPOINT} "
 fi
 
-# Journal Streams stay enabled only until the read model updater moves to the
-# head Streams in #586. ESA v5 itself does not require them.
+# The read model updater subscribes to the head Streams (DY-12). The journal
+# Streams are not used: they do not preserve the order of an aggregate's events.
 aws dynamodb create-table \
   ${ENDPOINT_URL_OPTION} \
   --table-name "${JOURNAL_TABLE_NAME}" \
@@ -52,8 +52,7 @@ aws dynamodb create-table \
     AttributeName=aid,KeyType=HASH \
     AttributeName=seq_nr,KeyType=RANGE \
   --provisioned-throughput \
-    ReadCapacityUnits=10,WriteCapacityUnits=10 \
-  --stream-specification StreamEnabled=true,StreamViewType=NEW_IMAGE
+    ReadCapacityUnits=10,WriteCapacityUnits=10
 
 aws dynamodb create-table \
   ${ENDPOINT_URL_OPTION} \

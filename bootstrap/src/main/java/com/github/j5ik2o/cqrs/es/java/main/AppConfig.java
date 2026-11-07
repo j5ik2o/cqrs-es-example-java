@@ -42,6 +42,7 @@ public class AppConfig {
   @Setter
   @ToString
   public static class Stream {
+    private String headTableName;
     private String journalTableName;
     private int maxItemCount;
   }
