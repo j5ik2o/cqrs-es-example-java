@@ -58,6 +58,17 @@ The local Read Model Updater subscribes to the head table's Streams. It drops du
 - [Debugging on Local Machine](docs/DEBUG_ON_LOCAL_MACHINE.md)
 - [Debugging on Docker Compose](docs/DEBUG_ON_DOCKER_COMPOSE.md)
 
+### End-to-End Test
+
+Build the application image and run the compose stack with LocalStack:
+
+```sh
+./tools/scripts/docker-build.sh
+./tools/scripts/docker-compose-e2e-test.sh
+```
+
+The script starts LocalStack, MySQL, the three applications, and the e2e test container. It returns the e2e test's exit code and prints the compose logs when the test fails. It then restarts the read model updater and runs the test again, so a replay of the retained head Streams must not duplicate the read model.
+
 ## Links
 
 - [Common Documents](https://github.com/j5ik2o/cqrs-es-example)
