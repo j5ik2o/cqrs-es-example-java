@@ -3,15 +3,13 @@ package com.github.j5ik2o.cqrs.es.java.command.interface_adaptor.repository.seri
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.github.j5ik2o.cqrs.es.java.domain.groupchat.GroupChatEvent;
-import com.github.j5ik2o.cqrs.es.java.domain.groupchat.GroupChatId;
-import com.github.j5ik2o.event.store.adapter.java.DeserializationException;
-import com.github.j5ik2o.event.store.adapter.java.EventSerializer;
-import com.github.j5ik2o.event.store.adapter.java.SerializationException;
+import com.github.j5ik2o.event.store.adapter.java.core.PayloadSerializer;
+import com.github.j5ik2o.event.store.adapter.java.core.SerializationException;
 import java.io.IOException;
 import javax.annotation.Nonnull;
+import javax.annotation.Nullable;
 
-public final class GroupChatEventSerializer
-    implements EventSerializer<GroupChatId, GroupChatEvent> {
+public final class GroupChatEventSerializer implements PayloadSerializer<GroupChatEvent> {
   private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
 
   static {
@@ -25,18 +23,17 @@ public final class GroupChatEventSerializer
     try {
       return OBJECT_MAPPER.writeValueAsBytes(groupChatEvent);
     } catch (JsonProcessingException e) {
-      throw new SerializationException(e);
+      throw new SerializationException("failed to serialize GroupChatEvent", e);
     }
   }
 
-  @Nonnull
+  @Nullable
   @Override
-  public GroupChatEvent deserialize(@Nonnull byte[] bytes, @Nonnull Class<GroupChatEvent> clazz)
-      throws DeserializationException {
+  public GroupChatEvent deserialize(@Nonnull byte[] bytes) throws SerializationException {
     try {
-      return OBJECT_MAPPER.readValue(bytes, clazz);
+      return OBJECT_MAPPER.readValue(bytes, GroupChatEvent.class);
     } catch (IOException e) {
-      throw new DeserializationException(e);
+      throw new SerializationException("failed to deserialize GroupChatEvent", e);
     }
   }
 }

@@ -25,14 +25,14 @@ ENDPOINT_URL_OPTION=""
 DYNAMODB_ENDPOINT=${DYNAMODB_ENDPOINT:-localhost:31566}
 
 JOURNAL_TABLE_NAME=${JOURNAL_TABLE_NAME:-"${PREFIX}-journal"}
-JOURNAL_GSI_NAME=${JOURNAL_GSI_NAME:-"${PREFIX}-aid-index"}
 SNAPSHOT_TABLE_NAME=${SNAPSHOT_TABLE_NAME:-"${PREFIX}-snapshot"}
-SNAPSHOT_GSI_NAME=${SNAPSHOT_GSI_NAME:-"${PREFIX}-aid-index"}
+HEAD_TABLE_NAME=${HEAD_TABLE_NAME:-"${PREFIX}-head"}
+SNAPSHOT_GSI_NAME=${SNAPSHOT_GSI_NAME:-"${PREFIX}-snapshot-aid-index"}
 
 echo "DYNAMODB_ENDPOINT = ${DYNAMODB_ENDPOINT}"
 echo "JOURNAL_TABLE_NAME = ${JOURNAL_TABLE_NAME}"
-echo "JOURNAL_GSI_NAME = ${JOURNAL_GSI_NAME}"
 echo "SNAPSHOT_TABLE_NAME = ${SNAPSHOT_TABLE_NAME}"
+echo "HEAD_TABLE_NAME = ${HEAD_TABLE_NAME}"
 echo "SNAPSHOT_GSI_NAME = ${SNAPSHOT_GSI_NAME}"
 
 if [ "${ENV_NAME}" = "dev" ]; then
@@ -40,47 +40,30 @@ if [ "${ENV_NAME}" = "dev" ]; then
   ENDPOINT_URL_OPTION=" --endpoint-url http://${DYNAMODB_ENDPOINT} "
 fi
 
+# Journal Streams stay enabled only until the read model updater moves to the
+# head Streams in #586. ESA v5 itself does not require them.
 aws dynamodb create-table \
   ${ENDPOINT_URL_OPTION} \
   --table-name "${JOURNAL_TABLE_NAME}" \
   --attribute-definitions \
-    AttributeName=pkey,AttributeType=S \
-    AttributeName=skey,AttributeType=S \
     AttributeName=aid,AttributeType=S \
     AttributeName=seq_nr,AttributeType=N \
   --key-schema \
-    AttributeName=pkey,KeyType=HASH \
-    AttributeName=skey,KeyType=RANGE \
+    AttributeName=aid,KeyType=HASH \
+    AttributeName=seq_nr,KeyType=RANGE \
   --provisioned-throughput \
     ReadCapacityUnits=10,WriteCapacityUnits=10 \
-  --global-secondary-indexes \
-  "[
-    {
-      \"IndexName\": \"${JOURNAL_GSI_NAME}\",
-      \"KeySchema\": [{\"AttributeName\":\"aid\",\"KeyType\":\"HASH\"},
-                      {\"AttributeName\":\"seq_nr\",\"KeyType\":\"RANGE\"}],
-      \"Projection\":{
-        \"ProjectionType\":\"ALL\"
-      },
-      \"ProvisionedThroughput\": {
-        \"ReadCapacityUnits\": 10,
-        \"WriteCapacityUnits\": 10
-      }
-    }
-  ]" \
   --stream-specification StreamEnabled=true,StreamViewType=NEW_IMAGE
 
-# shellcheck disable=SC2086
 aws dynamodb create-table \
   ${ENDPOINT_URL_OPTION} \
   --table-name "${SNAPSHOT_TABLE_NAME}" \
   --attribute-definitions \
-    AttributeName=pkey,AttributeType=S \
-    AttributeName=skey,AttributeType=S \
     AttributeName=aid,AttributeType=S \
-    AttributeName=seq_nr,AttributeType=N \
+    AttributeName=skey,AttributeType=N \
+    AttributeName=active_history_seq_nr,AttributeType=N \
   --key-schema \
-    AttributeName=pkey,KeyType=HASH \
+    AttributeName=aid,KeyType=HASH \
     AttributeName=skey,KeyType=RANGE \
   --provisioned-throughput \
     ReadCapacityUnits=10,WriteCapacityUnits=10 \
@@ -89,9 +72,9 @@ aws dynamodb create-table \
     {
       \"IndexName\": \"${SNAPSHOT_GSI_NAME}\",
       \"KeySchema\": [{\"AttributeName\":\"aid\",\"KeyType\":\"HASH\"},
-                      {\"AttributeName\":\"seq_nr\",\"KeyType\":\"RANGE\"}],
+                      {\"AttributeName\":\"active_history_seq_nr\",\"KeyType\":\"RANGE\"}],
       \"Projection\":{
-        \"ProjectionType\":\"ALL\"
+        \"ProjectionType\":\"KEYS_ONLY\"
       },
       \"ProvisionedThroughput\": {
         \"ReadCapacityUnits\": 10,
@@ -99,3 +82,14 @@ aws dynamodb create-table \
       }
     }
   ]"
+
+aws dynamodb create-table \
+  ${ENDPOINT_URL_OPTION} \
+  --table-name "${HEAD_TABLE_NAME}" \
+  --attribute-definitions \
+    AttributeName=aid,AttributeType=S \
+  --key-schema \
+    AttributeName=aid,KeyType=HASH \
+  --provisioned-throughput \
+    ReadCapacityUnits=10,WriteCapacityUnits=10 \
+  --stream-specification StreamEnabled=true,StreamViewType=NEW_IMAGE

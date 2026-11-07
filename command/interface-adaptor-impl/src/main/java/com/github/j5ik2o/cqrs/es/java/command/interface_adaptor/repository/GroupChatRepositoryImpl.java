@@ -1,18 +1,21 @@
 package com.github.j5ik2o.cqrs.es.java.command.interface_adaptor.repository;
 
 import com.github.j5ik2o.cqrs.es.java.domain.groupchat.*;
-import com.github.j5ik2o.event.store.adapter.java.EventStoreAsync;
+import com.github.j5ik2o.event.store.adapter.java.core.AggregateId;
+import com.github.j5ik2o.event.store.adapter.java.core.AsyncEventStore;
+import com.github.j5ik2o.event.store.adapter.java.core.EventEnvelope;
+import com.github.j5ik2o.event.store.adapter.java.core.SnapshotEnvelope;
 import io.vavr.collection.Vector;
 import io.vavr.control.Option;
 import java.util.concurrent.CompletableFuture;
 import java.util.function.BiPredicate;
 
 public class GroupChatRepositoryImpl implements GroupChatRepository {
-  private final EventStoreAsync<GroupChatId, GroupChat, GroupChatEvent> eventStore;
+  private final AsyncEventStore<GroupChatEvent, GroupChat> eventStore;
   private final Option<BiPredicate<GroupChatEvent, GroupChat>> snapshotPredicateOpt;
 
   private GroupChatRepositoryImpl(
-      EventStoreAsync<GroupChatId, GroupChat, GroupChatEvent> eventStore,
+      AsyncEventStore<GroupChatEvent, GroupChat> eventStore,
       Option<BiPredicate<GroupChatEvent, GroupChat>> snapshotPredicateOpt) {
     this.eventStore = eventStore;
     this.snapshotPredicateOpt = snapshotPredicateOpt;
@@ -31,23 +34,31 @@ public class GroupChatRepositoryImpl implements GroupChatRepository {
 
   @Override
   public CompletableFuture<Option<GroupChat>> findById(GroupChatId id) {
+    var aggregateId = toAggregateId(id);
     return eventStore
-        .getLatestSnapshotById(GroupChat.class, id)
+        .getLatestSnapshotById(aggregateId)
         .thenCompose(
             result -> {
               if (result.isEmpty()) {
                 return CompletableFuture.completedFuture(Option.none());
-              } else {
-                return eventStore
-                    .getEventsByIdSinceSequenceNumber(
-                        GroupChatEvent.class, id, result.get().getSequenceNumber() + 1)
-                    .thenApply(
-                        events -> Option.some(GroupChat.replay(Vector.ofAll(events), result.get())))
-                    .exceptionallyCompose(
-                        e ->
-                            CompletableFuture.failedFuture(
-                                new RepositoryException("occurred an error", e)));
               }
+              var snapshotOpt = result.get().snapshot();
+              if (snapshotOpt.isEmpty()) {
+                return CompletableFuture.completedFuture(Option.none());
+              }
+              var snapshot = snapshotOpt.get();
+              return eventStore
+                  .getEventsByIdSinceSeqNr(aggregateId, snapshot.seqNr() + 1)
+                  .thenApply(
+                      events ->
+                          Option.some(
+                              GroupChat.replay(
+                                  Vector.ofAll(events).map(EventEnvelope::payload),
+                                  snapshot.aggregate())))
+                  .exceptionallyCompose(
+                      e ->
+                          CompletableFuture.failedFuture(
+                              new RepositoryException("occurred an error", e)));
             })
         .exceptionallyCompose(
             e -> CompletableFuture.failedFuture(new RepositoryException("occurred an error", e)));
@@ -56,19 +67,41 @@ public class GroupChatRepositoryImpl implements GroupChatRepository {
   @Override
   public CompletableFuture<Void> store(GroupChatEvent event, GroupChat aggregate) {
     if (event.isCreated()
-        || snapshotPredicateOpt.fold(() -> false, (p) -> p.test(event, aggregate))) {
+        || snapshotPredicateOpt.fold(() -> false, p -> p.test(event, aggregate))) {
       return storeEventAndSnapshot(event, aggregate);
     } else {
-      return storeEvent(event, aggregate.getVersion());
+      return storeEvent(event);
     }
   }
 
   public CompletableFuture<Void> storeEventAndSnapshot(GroupChatEvent event, GroupChat aggregate) {
-    return eventStore.persistEventAndSnapshot(event, aggregate);
+    return eventStore.persistEventAndSnapshot(
+        toEventEnvelope(event), toSnapshotEnvelope(event, aggregate));
   }
 
-  public CompletableFuture<Void> storeEvent(GroupChatEvent event, long version) {
-    return eventStore.persistEvent(event, version);
+  public CompletableFuture<Void> storeEvent(GroupChatEvent event) {
+    return eventStore.persistEvent(toEventEnvelope(event));
+  }
+
+  private static AggregateId toAggregateId(GroupChatId id) {
+    return AggregateId.of(id.getTypeName(), id.getValue());
+  }
+
+  private static EventEnvelope<GroupChatEvent> toEventEnvelope(GroupChatEvent event) {
+    return EventEnvelope.<GroupChatEvent>builder()
+        .aggregateId(toAggregateId(event.aggregateId()))
+        .seqNr(event.sequenceNumber())
+        .occurredAt(event.occurredAt())
+        .payload(event)
+        .build();
+  }
+
+  private static SnapshotEnvelope<GroupChat> toSnapshotEnvelope(
+      GroupChatEvent event, GroupChat aggregate) {
+    return SnapshotEnvelope.<GroupChat>builder()
+        .aggregate(aggregate)
+        .seqNr(event.sequenceNumber())
+        .build();
   }
 
   public static Option<BiPredicate<GroupChatEvent, GroupChat>> retentionCriteriaOf(
@@ -76,13 +109,12 @@ public class GroupChatRepositoryImpl implements GroupChatRepository {
     return Option.some((event, ignore) -> event.sequenceNumber() % numberOfEvents == 0);
   }
 
-  public static GroupChatRepositoryImpl of(
-      EventStoreAsync<GroupChatId, GroupChat, GroupChatEvent> eventStore) {
+  public static GroupChatRepositoryImpl of(AsyncEventStore<GroupChatEvent, GroupChat> eventStore) {
     return new GroupChatRepositoryImpl(eventStore, Option.none());
   }
 
   public static GroupChatRepositoryImpl of(
-      EventStoreAsync<GroupChatId, GroupChat, GroupChatEvent> eventStore,
+      AsyncEventStore<GroupChatEvent, GroupChat> eventStore,
       Option<BiPredicate<GroupChatEvent, GroupChat>> snapshotPredicateOpt) {
     return new GroupChatRepositoryImpl(eventStore, snapshotPredicateOpt);
   }

@@ -6,7 +6,6 @@ import com.fasterxml.jackson.annotation.JsonTypeInfo;
 import com.fasterxml.jackson.annotation.JsonTypeName;
 import com.github.f4b6a3.ulid.Ulid;
 import com.github.j5ik2o.cqrs.es.java.domain.useraccount.UserAccountId;
-import com.github.j5ik2o.event.store.adapter.java.Event;
 import java.time.Instant;
 import javax.annotation.Nonnull;
 
@@ -20,7 +19,7 @@ import javax.annotation.Nonnull;
   @JsonSubTypes.Type(name = "messagePosted", value = GroupChatEvent.MessagePosted.class),
   @JsonSubTypes.Type(name = "messageDeleted", value = GroupChatEvent.MessageDeleted.class),
 })
-public sealed interface GroupChatEvent extends Event<GroupChatId>
+public sealed interface GroupChatEvent
     permits GroupChatEvent.Created,
         GroupChatEvent.Deleted,
         GroupChatEvent.Renamed,
@@ -33,7 +32,6 @@ public sealed interface GroupChatEvent extends Event<GroupChatId>
   Ulid id();
 
   @Nonnull
-  @Override
   default String getId() {
     return id().toString();
   }
@@ -42,7 +40,6 @@ public sealed interface GroupChatEvent extends Event<GroupChatId>
   GroupChatId aggregateId();
 
   @Nonnull
-  @Override
   default GroupChatId getAggregateId() {
     return aggregateId();
   }
@@ -57,7 +54,6 @@ public sealed interface GroupChatEvent extends Event<GroupChatId>
 
   long sequenceNumber();
 
-  @Override
   default long getSequenceNumber() {
     return sequenceNumber();
   }
@@ -66,7 +62,6 @@ public sealed interface GroupChatEvent extends Event<GroupChatId>
   Instant occurredAt();
 
   @Nonnull
-  @Override
   default Instant getOccurredAt() {
     return occurredAt();
   }

@@ -52,9 +52,8 @@ public class AppConfig {
   public static class Persistence {
     private String journalTableName;
     private String snapshotTableName;
-    private String journalAidIndexName;
+    private String headTableName;
     private String snapshotAidIndexName;
-    private int shardCount;
     private long snapshotInterval;
   }
 }

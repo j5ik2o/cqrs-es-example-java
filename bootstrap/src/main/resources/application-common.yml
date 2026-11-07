@@ -21,10 +21,9 @@ app:
     secret-access-key: x
   persistence:
     journal-table-name: journal
-    journal-aid-index-name: journal-aid-index
     snapshot-table-name: snapshot
+    head-table-name: head
     snapshot-aid-index-name: snapshot-aid-index
-    shard-count: 64
     snapshot-interval: 10
   stream:
     journal-table-name: journal

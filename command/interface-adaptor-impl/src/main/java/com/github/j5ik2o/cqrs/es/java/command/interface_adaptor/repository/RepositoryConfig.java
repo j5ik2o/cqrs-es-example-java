@@ -4,8 +4,11 @@ import com.github.j5ik2o.cqrs.es.java.command.interface_adaptor.repository.seria
 import com.github.j5ik2o.cqrs.es.java.command.interface_adaptor.repository.serialization.GroupChatSnapshotSerializer;
 import com.github.j5ik2o.cqrs.es.java.domain.groupchat.GroupChat;
 import com.github.j5ik2o.cqrs.es.java.domain.groupchat.GroupChatEvent;
-import com.github.j5ik2o.cqrs.es.java.domain.groupchat.GroupChatId;
-import com.github.j5ik2o.event.store.adapter.java.EventStoreAsync;
+import com.github.j5ik2o.event.store.adapter.java.core.AsyncEventStore;
+import com.github.j5ik2o.event.store.adapter.java.core.EventStoreConfig;
+import com.github.j5ik2o.event.store.adapter.java.core.RetentionPolicy;
+import com.github.j5ik2o.event.store.adapter.java.dynamodb.DynamoDbEventStore;
+import com.github.j5ik2o.event.store.adapter.java.dynamodb.DynamoDbTableConfig;
 import io.vavr.control.Option;
 import java.net.URI;
 import java.util.function.BiPredicate;
@@ -28,14 +31,11 @@ public class RepositoryConfig {
   @Value("${app.persistence.snapshot-table-name}")
   private String snapshotTableName;
 
-  @Value("${app.persistence.journal-aid-index-name}")
-  private String journalAidIndexName;
+  @Value("${app.persistence.head-table-name}")
+  private String headTableName;
 
   @Value("${app.persistence.snapshot-aid-index-name}")
   private String snapshotAidIndexName;
-
-  @Value("${app.persistence.shard-count}")
-  private int shardCount;
 
   @Value("${app.persistence.snapshot-interval}")
   private long snapshotInterval;
@@ -75,22 +75,27 @@ public class RepositoryConfig {
   }
 
   @Bean
-  public EventStoreAsync<GroupChatId, GroupChat, GroupChatEvent> eventStoreAsync(
+  public AsyncEventStore<GroupChatEvent, GroupChat> eventStoreAsync(
       @Qualifier("dynamoDbAsyncClient2") DynamoDbAsyncClient dynamoDbAsyncClient2) {
-    return EventStoreAsync.<GroupChatId, GroupChat, GroupChatEvent>ofDynamoDB(
-            dynamoDbAsyncClient2,
-            journalTableName,
-            snapshotTableName,
-            journalAidIndexName,
-            snapshotAidIndexName,
-            shardCount)
-        .withSnapshotSerializer(new GroupChatSnapshotSerializer())
-        .withEventSerializer(new GroupChatEventSerializer());
+    var tables =
+        DynamoDbTableConfig.builder()
+            .journalTableName(journalTableName)
+            .snapshotTableName(snapshotTableName)
+            .headTableName(headTableName)
+            .snapshotAidIndexName(snapshotAidIndexName)
+            .retentionPolicy(RetentionPolicy.none())
+            .build();
+    var eventStoreConfig =
+        EventStoreConfig.<GroupChatEvent, GroupChat>builder()
+            .payloadSerializer(new GroupChatEventSerializer())
+            .snapshotSerializer(new GroupChatSnapshotSerializer())
+            .build();
+    return DynamoDbEventStore.createAsync(dynamoDbAsyncClient2, tables, eventStoreConfig).join();
   }
 
   @Bean
   public GroupChatRepositoryImpl groupChatRepository(
-      EventStoreAsync<GroupChatId, GroupChat, GroupChatEvent> eventStoreAsync,
+      AsyncEventStore<GroupChatEvent, GroupChat> eventStoreAsync,
       Option<BiPredicate<GroupChatEvent, GroupChat>> snapshotPredicateOpt) {
     return GroupChatRepositoryImpl.of(eventStoreAsync, snapshotPredicateOpt);
   }
