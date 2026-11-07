@@ -68,19 +68,30 @@ class GroupChatEventSerializerTest {
     var id = GroupChatId.generate();
     var name = GroupChatName.of("test");
     var executorId = UserAccountId.generate();
-    var created = GroupChat.create(id, name, executorId)._2;
-    var groupChat = GroupChat.create(id, name, executorId)._1;
+    var created = GroupChat.create(id, name, executorId);
+    var groupChat = created._1;
+    var renamed = groupChat.rename(GroupChatName.of("renamed"), executorId).get();
+    var member = Member.of(MemberId.generate(), UserAccountId.generate(), MemberRole.MEMBER);
+    var memberAdded = groupChat.addMember(member, executorId).get();
+    var message = Message.of(MessageId.generate(), "before", executorId, LocalDateTime.now());
+    var messagePosted = memberAdded._1.postMessage(message, executorId).get();
+    var messageEdited = messagePosted._1.editMessage(message.getId(), "after", executorId).get();
     var events =
         List.of(
-            created,
-            groupChat.rename(GroupChatName.of("renamed"), executorId).get()._2,
-            groupChat
-                .addMember(
-                    Member.of(MemberId.generate(), UserAccountId.generate(), MemberRole.MEMBER),
-                    executorId)
+            created._2,
+            renamed._2,
+            memberAdded._2,
+            messagePosted._2,
+            messageEdited._2,
+            messageEdited
+                ._1
+                .removeMemberByUserAccountId(member.getUserAccountId(), executorId)
                 .get()
-                ._2);
+                ._2,
+            messageEdited._1.deleteMessageByMessageId(message.getId(), executorId).get()._2,
+            groupChat.delete(executorId).get()._2);
 
+    assertEquals(8, events.size());
     for (var event : events) {
       var json = objectMapper.readTree(serializer.serialize(event));
       assertEquals(event.typeName(), json.get("type").asText());
@@ -89,6 +100,7 @@ class GroupChatEventSerializerTest {
       assertFalse(json.has("sequenceNumber"));
       assertFalse(json.has("occurredAt"));
     }
+    assertEquals(8, events.stream().map(GroupChatEvent::typeName).distinct().count());
   }
 
   @Test
