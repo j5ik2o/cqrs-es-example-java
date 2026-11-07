@@ -7,6 +7,25 @@ USER_ACCOUNT_ID=${USER_ACCOUNT_ID:-UserAccount-01H7C6DWMK1BKS1JYH1XZE529M}
 WRITE_API_SERVER_BASE_URL=${WRITE_API_SERVER_BASE_URL:-http://localhost:58080/graphql}
 READ_API_SERVER_BASE_URL=${READ_API_SERVER_BASE_URL:-http://localhost:58082/graphql}
 
+# GraphQL が応答するまで待つ。固定の sleep だけで判定しない。
+wait_for_graphql() {
+	local name=$1
+	local url=$2
+	for _ in $(seq 1 60); do
+		if curl -sf -X POST -H "Content-Type: application/json" \
+			"${url}" -d '{"query":"{ __typename }"}' | jq -e '.data.__typename' > /dev/null 2>&1; then
+			echo "${name} is ready"
+			return 0
+		fi
+		sleep 1
+	done
+	echo "Error: ${name} did not become ready at ${url}"
+	return 1
+}
+
+wait_for_graphql "Write API" "${WRITE_API_SERVER_BASE_URL}"
+wait_for_graphql "Read API" "${READ_API_SERVER_BASE_URL}"
+
 # グループチャット作成
 echo -e "\nCreate GroupChat(${ADMIN_ID}):"
 CREATE_GROUP_CHAT_RESULT=$(curl -s -X POST -H "Content-Type: application/json" \
@@ -229,30 +248,30 @@ echo "Result: $GET_MESSAGES_RESULT"
 
 
 # メッセージ編集
-#echo -e "\nEdit Message(${GROUP_CHAT_ID}, ${USER_ACCOUNT_ID}):"
-#EDIT_MESSAGE_RESULT=$(curl -s -X POST -H "Content-Type: application/json" \
-#	${WRITE_API_SERVER_BASE_URL} \
-#	-d @- <<EOS
-#{
-#  "query": "mutation EditMessage(\$input: EditMessageInput!) { editMessage(input: \$input) { groupChatId } }",
-#  "variables": {
-#    "input": {
-#      "groupChatId": "${GROUP_CHAT_ID}",
-#      "messageId": "${MESSAGE_ID}",
-#      "content": "Text2",
-#      "executorId": "${USER_ACCOUNT_ID}"
-#    }
-#  }
-#}
-#EOS
-#)
+echo -e "\nEdit Message(${GROUP_CHAT_ID}, ${USER_ACCOUNT_ID}):"
+EDIT_MESSAGE_RESULT=$(curl -s -X POST -H "Content-Type: application/json" \
+	${WRITE_API_SERVER_BASE_URL} \
+	-d @- <<EOS
+{
+  "query": "mutation EditMessage(\$input: EditMessageInput!) { editMessage(input: \$input) { groupChatId } }",
+  "variables": {
+    "input": {
+      "groupChatId": "${GROUP_CHAT_ID}",
+      "messageId": "${MESSAGE_ID}",
+      "content": "Text2",
+      "executorId": "${USER_ACCOUNT_ID}"
+    }
+  }
+}
+EOS
+)
 
-#if echo $EDIT_MESSAGE_RESULT | jq -e .errors > /dev/null; then
-#  echo "Error: $EDIT_MESSAGE_RESULT"
-#  exit 1
-#fi
+if echo $EDIT_MESSAGE_RESULT | jq -e .errors > /dev/null; then
+  echo "Error: $EDIT_MESSAGE_RESULT"
+  exit 1
+fi
 
-#echo "Result: $EDIT_MESSAGE_RESULT"
+echo "Result: $EDIT_MESSAGE_RESULT"
 
 # メッセージの削除
 echo -e "\nDelete Message(${GROUP_CHAT_ID}, ${MESSAGE_ID}, ${USER_ACCOUNT_ID}):"

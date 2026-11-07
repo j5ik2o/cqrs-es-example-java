@@ -75,8 +75,7 @@ public class MutationResolverImpl implements MutationResolver {
         GroupChatId.validate(input.getGroupChatId()).fold(Mono::error, Mono::just);
     Mono<UserAccountId> userAccountIdMono =
         UserAccountId.validate(input.getUserAccountId()).fold(Mono::error, Mono::just);
-    Mono<MemberRole> memberRoleMono =
-        MemberRole.validate(input.getRole().name()).fold(Mono::error, Mono::just);
+    Mono<MemberRole> memberRoleMono = Mono.just(toMemberRole(input.getRole()));
     Mono<UserAccountId> executorIdMono =
         UserAccountId.validate(input.getExecutorId()).fold(Mono::error, Mono::just);
     Mono<Member> memberMono =
@@ -143,6 +142,28 @@ public class MutationResolverImpl implements MutationResolver {
 
   @MutationMapping
   @Override
+  public Mono<GroupChatOutput> editMessage(@Argument("input") EditMessageInput input)
+      throws Exception {
+    Mono<GroupChatId> groupChatIdMono =
+        GroupChatId.validate(input.getGroupChatId()).fold(Mono::error, Mono::just);
+    Mono<MessageId> messageIdMono =
+        MessageId.validate(input.getMessageId()).fold(Mono::error, Mono::just);
+    Mono<String> contentMono =
+        Message.validateContent(input.getContent()).fold(Mono::error, Mono::just);
+    Mono<UserAccountId> executorIdMono =
+        UserAccountId.validate(input.getExecutorId()).fold(Mono::error, Mono::just);
+
+    return Mono.zip(groupChatIdMono, messageIdMono, contentMono, executorIdMono)
+        .flatMap(
+            tuple ->
+                Mono.fromFuture(
+                    groupChatCommandProcessor.editMessage(
+                        tuple.getT1(), tuple.getT2(), tuple.getT3(), tuple.getT4())))
+        .map(result -> new GroupChatOutput(result.asString()));
+  }
+
+  @MutationMapping
+  @Override
   public Mono<GroupChatOutput> deleteMessage(@Argument("input") DeleteMessageInput input)
       throws Exception {
     Mono<GroupChatId> groupChatIdMono =
@@ -159,5 +180,12 @@ public class MutationResolverImpl implements MutationResolver {
                     groupChatCommandProcessor.deleteMessage(
                         tuple.getT1(), tuple.getT2(), tuple.getT3())))
         .map(result -> new GroupChatOutput(result.asString()));
+  }
+
+  private static MemberRole toMemberRole(Role role) {
+    return switch (role) {
+      case MEMBER -> MemberRole.MEMBER;
+      case ADMIN -> MemberRole.ADMINISTRATOR;
+    };
   }
 }

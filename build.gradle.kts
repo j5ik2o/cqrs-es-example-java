@@ -78,8 +78,8 @@ subprojects {
     dependencies {
         implementation("com.google.code.findbugs:jsr305:3.0.2")
         implementation("org.projectlombok:lombok:1.18.48")
-        testImplementation("org.junit.jupiter:junit-jupiter-api:6.1.3")
-        testRuntimeOnly("org.junit.jupiter:junit-jupiter-engine:6.1.3")
+        testImplementation("org.junit.jupiter:junit-jupiter-api")
+        testRuntimeOnly("org.junit.jupiter:junit-jupiter-engine")
         implementation("io.vavr:vavr:1.1.0")
 
         testImplementation("org.springframework.boot:spring-boot-testcontainers")
@@ -128,6 +128,10 @@ project(":infrastructure") {
 }
 
 project(":command:domain") {
+    tasks.test {
+        enabled = true
+    }
+
     dependencies {
         implementation("io.github.j5ik2o:event-store-adapter-java:5.1.0")
         implementation(project(":infrastructure"))
@@ -149,6 +153,11 @@ project(":command:interface-adaptor-if") {
 
 project(":command:interface-adaptor-impl") {
     apply(plugin = "io.github.kobylynskyi.graphql.codegen")
+
+    tasks.test {
+        enabled = true
+    }
+
     dependencies {
         implementation(project(":infrastructure"))
         implementation(project(":command:domain"))
@@ -161,7 +170,6 @@ project(":command:interface-adaptor-impl") {
         testImplementation("org.springframework.boot:spring-boot-starter-test")
 
         implementation("org.springframework.boot:spring-boot-starter-graphql")
-        implementation("com.graphql-java:graphql-java:230521-nf-execution")
 
         testImplementation("org.springframework:spring-webflux")
         implementation("mysql:mysql-connector-java:8.0.33")
@@ -224,7 +232,6 @@ project(":query:interface-adaptor") {
         implementation("javax.validation:validation-api:2.0.1.Final")
         implementation("org.springframework:spring-context")
         implementation("org.springframework.boot:spring-boot-starter-graphql")
-        implementation("com.graphql-java:graphql-java:230521-nf-execution")
         implementation("org.mybatis.spring.boot:mybatis-spring-boot-starter:4.1.0")
         testImplementation("org.mybatis.spring.boot:mybatis-spring-boot-starter-test:4.1.0")
         testImplementation("org.flywaydb:flyway-core:13.12.1")
