@@ -13,6 +13,7 @@ import java.io.UncheckedIOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.util.List;
 import org.junit.jupiter.api.Test;
 
 /** Checks the values operators rely on in the CloudFormation deployment asset. */
@@ -150,6 +151,142 @@ class RmuDeploymentTemplateTest {
         parameters.at("/RetryInitialDelayMillis/Default").asLong());
     assertEquals(
         policy.maxDelay().toMillis(), parameters.at("/RetryMaxDelayMillis/Default").asLong());
+  }
+
+  @Test
+  void readsDatabaseCredentialsFromSecretsManager() {
+    var template = template();
+
+    assertTrue(template.at("/Parameters/DataSourceUsername").isMissingNode());
+    assertTrue(template.at("/Parameters/DataSourcePassword").isMissingNode());
+
+    for (var function : List.of("RmuFunction", "RecoveryWorkerFunction", "ResyncWorkerFunction")) {
+      assertEquals(
+          "DataSourceSecretArn",
+          template
+              .at(
+                  "/Resources/"
+                      + function
+                      + "/Properties/Environment/Variables/APP_DB_SECRET_ARN/Ref")
+              .asText());
+      assertTrue(
+          template
+              .at(
+                  "/Resources/"
+                      + function
+                      + "/Properties/Environment/Variables/SPRING_DATASOURCE_PASSWORD")
+              .isMissingNode());
+    }
+
+    assertTrue(grantsSecretRead(template, "RmuFunctionRole"));
+    assertTrue(grantsSecretRead(template, "RecoveryWorkerFunctionRole"));
+    assertTrue(grantsSecretRead(template, "ResyncWorkerFunctionRole"));
+  }
+
+  @Test
+  void capsTheRecoveryWorkerConcurrency() {
+    var template = template();
+
+    assertEquals(
+        "RecoveryWorkerReservedConcurrency",
+        template
+            .at("/Resources/RecoveryWorkerFunction/Properties/ReservedConcurrentExecutions/Ref")
+            .asText());
+    assertEquals(1, template.at("/Parameters/RecoveryWorkerReservedConcurrency/Default").asInt());
+    assertTrue(template.at("/Parameters/RecoveryWorkerReservedConcurrency/MinValue").asInt() >= 1);
+  }
+
+  @Test
+  void recommendsSixTimesTheWorkerTimeoutForTheQueueVisibility() {
+    var template = template();
+    var visibilityTimeout =
+        template.at("/Parameters/RecoveryQueueVisibilityTimeoutSeconds/Default").asLong();
+    var workerTimeout = template.at("/Parameters/RecoveryWorkerTimeoutSeconds/Default").asLong();
+
+    assertTrue(visibilityTimeout >= workerTimeout * 6);
+  }
+
+  @Test
+  void alarmsOnTheRecoveryBacklog() {
+    var alarm = template().at("/Resources/RecoveryBacklogAlarm/Properties");
+
+    assertEquals("AWS/SQS", alarm.path("Namespace").asText());
+    assertEquals("ApproximateNumberOfMessagesVisible", alarm.path("MetricName").asText());
+    assertEquals("RecoveryQueue", alarm.at("/Dimensions/0/Value/Fn::GetAtt/0").asText());
+    assertEquals("RecoveryBacklogThreshold", alarm.at("/Threshold/Ref").asText());
+  }
+
+  @Test
+  void alarmsWhenStreamRetriesAreExhausted() {
+    var template = template();
+
+    assertEquals(
+        "AWS/SQS", template.at("/Resources/OnFailureQueueAlarm/Properties/Namespace").asText());
+    assertEquals(
+        "OnFailureQueue",
+        template
+            .at("/Resources/OnFailureQueueAlarm/Properties/Dimensions/0/Value/Fn::GetAtt/0")
+            .asText());
+  }
+
+  @Test
+  void alarmsOnTheRecoveryDeadLetterQueue() {
+    var template = template();
+
+    assertEquals(
+        "AWS/SQS", template.at("/Resources/RecoveryDlqAlarm/Properties/Namespace").asText());
+    assertEquals(
+        "RecoveryDlq",
+        template
+            .at("/Resources/RecoveryDlqAlarm/Properties/Dimensions/0/Value/Fn::GetAtt/0")
+            .asText());
+  }
+
+  @Test
+  void alarmsOnResyncFailures() {
+    var template = template();
+
+    assertEquals(
+        "Errors", template.at("/Resources/ResyncWorkerErrorsAlarm/Properties/MetricName").asText());
+    assertEquals(
+        "ResyncWorkerFunction",
+        template
+            .at("/Resources/ResyncWorkerErrorsAlarm/Properties/Dimensions/0/Value/Ref")
+            .asText());
+    assertEquals(
+        "FailedInvocations",
+        template
+            .at("/Resources/ResyncScheduleFailedInvocationsAlarm/Properties/MetricName")
+            .asText());
+    assertEquals(
+        "ResyncWorkerSchedule",
+        template
+            .at("/Resources/ResyncScheduleFailedInvocationsAlarm/Properties/Dimensions/0/Value/Ref")
+            .asText());
+  }
+
+  @Test
+  void sendsAlarmActionsOnlyWhenATopicIsConfigured() {
+    var template = template();
+
+    assertEquals(
+        "HasAlarmTopic",
+        template.at("/Resources/RecoveryBacklogAlarm/Properties/AlarmActions/Fn::If/0").asText());
+    assertEquals("", template.at("/Parameters/AlarmSnsTopicArn/Default").asText());
+    assertEquals(
+        "AlarmSnsTopicArn",
+        template.at("/Conditions/HasAlarmTopic/Fn::Not/0/Fn::Equals/0/Ref").asText());
+  }
+
+  private static boolean grantsSecretRead(JsonNode template, String role) {
+    for (var statement :
+        template.at("/Resources/" + role + "/Properties/Policies/0/PolicyDocument/Statement")) {
+      if ("secretsmanager:GetSecretValue".equals(statement.path("Action").asText())
+          && "DataSourceSecretArn".equals(statement.at("/Resource/Ref").asText())) {
+        return true;
+      }
+    }
+    return false;
   }
 
   private static void assertHandler(String pointer, Class<?> type, Class<?> eventType)

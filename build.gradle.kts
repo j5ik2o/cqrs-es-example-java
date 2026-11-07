@@ -1,5 +1,6 @@
 import com.google.cloud.tools.jib.api.buildplan.ImageFormat
 import io.github.kobylynskyi.graphql.codegen.gradle.GraphQLCodegenGradleTask
+import org.gradle.api.tasks.bundling.Zip
 import org.springframework.boot.gradle.tasks.bundling.BootJar
 
 plugins {
@@ -296,11 +297,25 @@ project(":rmu") {
         implementation("com.amazonaws:aws-lambda-java-core:1.4.1")
         implementation("io.github.j5ik2o:event-store-adapter-java:5.1.0")
         implementation("software.amazon.awssdk:dynamodb:2.57.11")
+        implementation("software.amazon.awssdk:secretsmanager:2.57.11")
         implementation("software.amazon.awssdk:sqs:2.57.11")
 
         implementation("com.fasterxml.jackson.core:jackson-databind:2.22.4")
         implementation("com.fasterxml.jackson.core:jackson-annotations:2.22")
         implementation("com.fasterxml.jackson.datatype:jackson-datatype-jsr310:2.22.4")
+    }
+
+    // AWS Lambda loads the handler classes from the ZIP root and the dependency JARs from lib/.
+    val runtimeClasspath = configurations.getByName("runtimeClasspath")
+    tasks.register<Zip>("lambdaZip") {
+        group = "build"
+        description =
+            "Builds the Lambda deployment package with the RMU, recovery worker, and resync worker handlers."
+        dependsOn(tasks.named("classes"))
+        archiveFileName.set("rmu-lambda.zip")
+        destinationDirectory.set(layout.buildDirectory.dir("distributions"))
+        from(sourceSets.getByName("main").output)
+        from(runtimeClasspath.filter { it.name.endsWith(".jar") }) { into("lib") }
     }
 }
 

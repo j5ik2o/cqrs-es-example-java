@@ -1,9 +1,9 @@
 {
   "AWSTemplateFormatVersion": "2010-09-09",
-  "Description": "RMU Lambda, head-stream event source mapping, OnFailure SQS, and SQS recovery worker for cqrs-es-example-java. The Lambda code artifact is supplied as parameters; this repository does not build or upload it.",
+  "Description": "RMU Lambda, head-stream event source mapping, OnFailure SQS, SQS recovery worker, resync worker, and CloudWatch alarms for cqrs-es-example-java. Build the Lambda code artifact with deploy/build-lambda-package.sh and upload it before applying this stack.",
   "Metadata": {
     "Project": "cqrs-es-example-java",
-    "Issue": "https://github.com/j5ik2o/cqrs-es-example-java/issues/625"
+    "Issue": "https://github.com/j5ik2o/cqrs-es-example-java/issues/627"
   },
   "Parameters": {
     "CodeS3Bucket": {
@@ -31,13 +31,9 @@
       "NoEcho": true,
       "Description": "JDBC URL of the MySQL read model, for example jdbc:mysql://db.example:3306/ceer."
     },
-    "DataSourceUsername": {
+    "DataSourceSecretArn": {
       "Type": "String",
-      "NoEcho": true
-    },
-    "DataSourcePassword": {
-      "Type": "String",
-      "NoEcho": true
+      "Description": "ARN of the Secrets Manager secret that holds the MySQL credentials as JSON with username and password keys. An optional url key overrides DataSourceUrl."
     },
     "VpcId": {
       "Type": "String",
@@ -66,6 +62,13 @@
       "Default": 300,
       "MinValue": 30,
       "MaxValue": 900
+    },
+    "RecoveryWorkerReservedConcurrency": {
+      "Type": "Number",
+      "Default": 1,
+      "MinValue": 1,
+      "MaxValue": 100,
+      "Description": "Reserved concurrency of the recovery worker. One keeps a single replay in flight; raise it only when the recovery task store tolerates concurrent runs."
     },
     "ResyncWorkerTimeoutSeconds": {
       "Type": "Number",
@@ -142,6 +145,17 @@
     "RecoveryMaxReceiveCount": {
       "Type": "Number",
       "Default": 5
+    },
+    "AlarmSnsTopicArn": {
+      "Type": "String",
+      "Default": "",
+      "Description": "Optional SNS topic ARN that receives the CloudWatch alarm actions. Leave empty to create the alarms without actions."
+    },
+    "RecoveryBacklogThreshold": {
+      "Type": "Number",
+      "Default": 10,
+      "MinValue": 1,
+      "Description": "Visible recovery queue messages that trigger the backlog alarm."
     }
   },
   "Conditions": {
@@ -151,6 +165,18 @@
           "Fn::Equals": [
             {
               "Ref": "VpcId"
+            },
+            ""
+          ]
+        }
+      ]
+    },
+    "HasAlarmTopic": {
+      "Fn::Not": [
+        {
+          "Fn::Equals": [
+            {
+              "Ref": "AlarmSnsTopicArn"
             },
             ""
           ]
@@ -301,6 +327,14 @@
                       ]
                     }
                   ]
+                },
+                {
+                  "Sid": "ReadDatabaseSecret",
+                  "Effect": "Allow",
+                  "Action": "secretsmanager:GetSecretValue",
+                  "Resource": {
+                    "Ref": "DataSourceSecretArn"
+                  }
                 }
               ]
             }
@@ -369,6 +403,14 @@
                       "RecoveryQueue",
                       "Arn"
                     ]
+                  }
+                },
+                {
+                  "Sid": "ReadDatabaseSecret",
+                  "Effect": "Allow",
+                  "Action": "secretsmanager:GetSecretValue",
+                  "Resource": {
+                    "Ref": "DataSourceSecretArn"
                   }
                 }
               ]
@@ -451,11 +493,8 @@
             "SPRING_DATASOURCE_URL": {
               "Ref": "DataSourceUrl"
             },
-            "SPRING_DATASOURCE_USERNAME": {
-              "Ref": "DataSourceUsername"
-            },
-            "SPRING_DATASOURCE_PASSWORD": {
-              "Ref": "DataSourcePassword"
+            "APP_DB_SECRET_ARN": {
+              "Ref": "DataSourceSecretArn"
             }
           }
         }
@@ -517,6 +556,9 @@
           "Ref": "RecoveryWorkerTimeoutSeconds"
         },
         "MemorySize": 1024,
+        "ReservedConcurrentExecutions": {
+          "Ref": "RecoveryWorkerReservedConcurrency"
+        },
         "Role": {
           "Fn::GetAtt": [
             "RecoveryWorkerFunctionRole",
@@ -553,11 +595,8 @@
             "SPRING_DATASOURCE_URL": {
               "Ref": "DataSourceUrl"
             },
-            "SPRING_DATASOURCE_USERNAME": {
-              "Ref": "DataSourceUsername"
-            },
-            "SPRING_DATASOURCE_PASSWORD": {
-              "Ref": "DataSourcePassword"
+            "APP_DB_SECRET_ARN": {
+              "Ref": "DataSourceSecretArn"
             }
           }
         }
@@ -679,6 +718,14 @@
                       "Arn"
                     ]
                   }
+                },
+                {
+                  "Sid": "ReadDatabaseSecret",
+                  "Effect": "Allow",
+                  "Action": "secretsmanager:GetSecretValue",
+                  "Resource": {
+                    "Ref": "DataSourceSecretArn"
+                  }
                 }
               ]
             }
@@ -745,11 +792,8 @@
             "SPRING_DATASOURCE_URL": {
               "Ref": "DataSourceUrl"
             },
-            "SPRING_DATASOURCE_USERNAME": {
-              "Ref": "DataSourceUsername"
-            },
-            "SPRING_DATASOURCE_PASSWORD": {
-              "Ref": "DataSourcePassword"
+            "APP_DB_SECRET_ARN": {
+              "Ref": "DataSourceSecretArn"
             }
           }
         }
@@ -791,6 +835,227 @@
           "Fn::GetAtt": [
             "ResyncWorkerSchedule",
             "Arn"
+          ]
+        }
+      }
+    },
+    "RecoveryBacklogAlarm": {
+      "Type": "AWS::CloudWatch::Alarm",
+      "Properties": {
+        "AlarmDescription": "The recovery queue has a visible backlog. Pending recovery tasks may be stuck behind a failing replay.",
+        "Namespace": "AWS/SQS",
+        "MetricName": "ApproximateNumberOfMessagesVisible",
+        "Dimensions": [
+          {
+            "Name": "QueueName",
+            "Value": {
+              "Fn::GetAtt": [
+                "RecoveryQueue",
+                "QueueName"
+              ]
+            }
+          }
+        ],
+        "Statistic": "Maximum",
+        "Period": 300,
+        "EvaluationPeriods": 2,
+        "Threshold": {
+          "Ref": "RecoveryBacklogThreshold"
+        },
+        "ComparisonOperator": "GreaterThanOrEqualToThreshold",
+        "TreatMissingData": "notBreaching",
+        "AlarmActions": {
+          "Fn::If": [
+            "HasAlarmTopic",
+            [
+              {
+                "Ref": "AlarmSnsTopicArn"
+              }
+            ],
+            {
+              "Ref": "AWS::NoValue"
+            }
+          ]
+        }
+      }
+    },
+    "RecoveryWorkerErrorsAlarm": {
+      "Type": "AWS::CloudWatch::Alarm",
+      "Properties": {
+        "AlarmDescription": "The recovery worker returned errors. Pending recovery tasks may not be draining.",
+        "Namespace": "AWS/Lambda",
+        "MetricName": "Errors",
+        "Dimensions": [
+          {
+            "Name": "FunctionName",
+            "Value": {
+              "Ref": "RecoveryWorkerFunction"
+            }
+          }
+        ],
+        "Statistic": "Sum",
+        "Period": 300,
+        "EvaluationPeriods": 1,
+        "Threshold": 0,
+        "ComparisonOperator": "GreaterThanThreshold",
+        "TreatMissingData": "notBreaching",
+        "AlarmActions": {
+          "Fn::If": [
+            "HasAlarmTopic",
+            [
+              {
+                "Ref": "AlarmSnsTopicArn"
+              }
+            ],
+            {
+              "Ref": "AWS::NoValue"
+            }
+          ]
+        }
+      }
+    },
+    "OnFailureQueueAlarm": {
+      "Type": "AWS::CloudWatch::Alarm",
+      "Properties": {
+        "AlarmDescription": "Stream records exhausted their retries and were sent to the OnFailure queue.",
+        "Namespace": "AWS/SQS",
+        "MetricName": "ApproximateNumberOfMessagesVisible",
+        "Dimensions": [
+          {
+            "Name": "QueueName",
+            "Value": {
+              "Fn::GetAtt": [
+                "OnFailureQueue",
+                "QueueName"
+              ]
+            }
+          }
+        ],
+        "Statistic": "Maximum",
+        "Period": 300,
+        "EvaluationPeriods": 1,
+        "Threshold": 0,
+        "ComparisonOperator": "GreaterThanThreshold",
+        "TreatMissingData": "notBreaching",
+        "AlarmActions": {
+          "Fn::If": [
+            "HasAlarmTopic",
+            [
+              {
+                "Ref": "AlarmSnsTopicArn"
+              }
+            ],
+            {
+              "Ref": "AWS::NoValue"
+            }
+          ]
+        }
+      }
+    },
+    "RecoveryDlqAlarm": {
+      "Type": "AWS::CloudWatch::Alarm",
+      "Properties": {
+        "AlarmDescription": "The recovery dead-letter queue has messages. A recovery task exhausted its retries and needs a manual replay.",
+        "Namespace": "AWS/SQS",
+        "MetricName": "ApproximateNumberOfMessagesVisible",
+        "Dimensions": [
+          {
+            "Name": "QueueName",
+            "Value": {
+              "Fn::GetAtt": [
+                "RecoveryDlq",
+                "QueueName"
+              ]
+            }
+          }
+        ],
+        "Statistic": "Maximum",
+        "Period": 300,
+        "EvaluationPeriods": 1,
+        "Threshold": 0,
+        "ComparisonOperator": "GreaterThanThreshold",
+        "TreatMissingData": "notBreaching",
+        "AlarmActions": {
+          "Fn::If": [
+            "HasAlarmTopic",
+            [
+              {
+                "Ref": "AlarmSnsTopicArn"
+              }
+            ],
+            {
+              "Ref": "AWS::NoValue"
+            }
+          ]
+        }
+      }
+    },
+    "ResyncWorkerErrorsAlarm": {
+      "Type": "AWS::CloudWatch::Alarm",
+      "Properties": {
+        "AlarmDescription": "The resync worker returned errors. The full head resync may not have completed.",
+        "Namespace": "AWS/Lambda",
+        "MetricName": "Errors",
+        "Dimensions": [
+          {
+            "Name": "FunctionName",
+            "Value": {
+              "Ref": "ResyncWorkerFunction"
+            }
+          }
+        ],
+        "Statistic": "Sum",
+        "Period": 300,
+        "EvaluationPeriods": 1,
+        "Threshold": 0,
+        "ComparisonOperator": "GreaterThanThreshold",
+        "TreatMissingData": "notBreaching",
+        "AlarmActions": {
+          "Fn::If": [
+            "HasAlarmTopic",
+            [
+              {
+                "Ref": "AlarmSnsTopicArn"
+              }
+            ],
+            {
+              "Ref": "AWS::NoValue"
+            }
+          ]
+        }
+      }
+    },
+    "ResyncScheduleFailedInvocationsAlarm": {
+      "Type": "AWS::CloudWatch::Alarm",
+      "Properties": {
+        "AlarmDescription": "The scheduled resync rule could not invoke the resync worker.",
+        "Namespace": "AWS/Events",
+        "MetricName": "FailedInvocations",
+        "Dimensions": [
+          {
+            "Name": "RuleName",
+            "Value": {
+              "Ref": "ResyncWorkerSchedule"
+            }
+          }
+        ],
+        "Statistic": "Sum",
+        "Period": 300,
+        "EvaluationPeriods": 1,
+        "Threshold": 0,
+        "ComparisonOperator": "GreaterThanThreshold",
+        "TreatMissingData": "notBreaching",
+        "AlarmActions": {
+          "Fn::If": [
+            "HasAlarmTopic",
+            [
+              {
+                "Ref": "AlarmSnsTopicArn"
+              }
+            ],
+            {
+              "Ref": "AWS::NoValue"
+            }
           ]
         }
       }
@@ -839,6 +1104,16 @@
     "RecoveryQueueUrl": {
       "Value": {
         "Ref": "RecoveryQueue"
+      }
+    },
+    "OnFailureDlqUrl": {
+      "Value": {
+        "Ref": "OnFailureDlq"
+      }
+    },
+    "RecoveryDlqUrl": {
+      "Value": {
+        "Ref": "RecoveryDlq"
       }
     },
     "RecoveryWorkerFunctionName": {
