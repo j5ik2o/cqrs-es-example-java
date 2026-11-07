@@ -20,6 +20,7 @@ import software.amazon.awssdk.auth.credentials.StaticCredentialsProvider;
 import software.amazon.awssdk.awscore.client.builder.AwsClientBuilder;
 import software.amazon.awssdk.regions.Region;
 import software.amazon.awssdk.services.dynamodb.DynamoDbClient;
+import software.amazon.awssdk.services.secretsmanager.SecretsManagerClient;
 import software.amazon.awssdk.services.sqs.SqsClient;
 
 /**
@@ -143,13 +144,10 @@ public final class LambdaRmuDependencies {
   }
 
   private static SqlSessionFactory createSqlSessionFactory() {
-    var url = env("SPRING_DATASOURCE_URL", env("DATABASE_URL", null));
-    if (url == null) {
-      throw new IllegalStateException("SPRING_DATASOURCE_URL or DATABASE_URL is required");
-    }
-    var username = env("SPRING_DATASOURCE_USERNAME", env("DATABASE_USERNAME", ""));
-    var password = env("SPRING_DATASOURCE_PASSWORD", env("DATABASE_PASSWORD", ""));
-    var dataSource = new PooledDataSource("com.mysql.cj.jdbc.Driver", url, username, password);
+    var settings = resolveDatabaseSettings();
+    var dataSource =
+        new PooledDataSource(
+            "com.mysql.cj.jdbc.Driver", settings.url(), settings.username(), settings.password());
     var environment = new Environment("lambda", new JdbcTransactionFactory(), dataSource);
     var configuration = new Configuration(environment);
     configuration.addMapper(GroupChatWriteMapper.class);
@@ -158,6 +156,37 @@ public final class LambdaRmuDependencies {
     configuration.addMapper(ReadModelPositionMapper.class);
     configuration.addMapper(RecoveryTaskMapper.class);
     return new SqlSessionFactoryBuilder().build(configuration);
+  }
+
+  /**
+   * Resolves MySQL credentials from Secrets Manager when a secret ARN is configured. The secret is
+   * a JSON object with {@code username} and {@code password}; its optional {@code url} overrides
+   * {@code SPRING_DATASOURCE_URL}. Without a secret ARN the plain environment variables stay
+   * supported for local runs.
+   */
+  private static DatabaseSettings resolveDatabaseSettings() {
+    var url = env("SPRING_DATASOURCE_URL", env("DATABASE_URL", null));
+    var secretArn = env("APP_DB_SECRET_ARN", null);
+    if (secretArn != null) {
+      return DatabaseSettings.fromSecretJson(fetchSecret(secretArn), url);
+    }
+    return DatabaseSettings.fromEnvironment(
+        url,
+        env("SPRING_DATASOURCE_USERNAME", env("DATABASE_USERNAME", "")),
+        env("SPRING_DATASOURCE_PASSWORD", env("DATABASE_PASSWORD", "")));
+  }
+
+  private static String fetchSecret(String secretArn) {
+    var builder = SecretsManagerClient.builder();
+    applyClientConfig(
+        builder,
+        "APP_DB_SECRET_REGION",
+        "APP_DB_SECRET_ENDPOINT_URL",
+        "APP_DB_SECRET_ACCESS_KEY_ID",
+        "APP_DB_SECRET_SECRET_ACCESS_KEY");
+    try (var client = builder.build()) {
+      return client.getSecretValue(request -> request.secretId(secretArn)).secretString();
+    }
   }
 
   private static String env(String name, String fallback) {
