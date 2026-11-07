@@ -12,6 +12,8 @@ import java.util.concurrent.CompletableFuture;
 import java.util.function.BiPredicate;
 
 public class GroupChatRepositoryImpl implements GroupChatRepository {
+  public static final String SNAPSHOT_MANIFEST = "GroupChat@" + GroupChatEvent.SCHEMA_VERSION;
+
   private final AsyncEventStore<GroupChatEvent, GroupChat> eventStore;
   private final Option<BiPredicate<GroupChatEvent, GroupChat>> snapshotPredicateOpt;
 
@@ -78,27 +80,28 @@ public class GroupChatRepositoryImpl implements GroupChatRepository {
   }
 
   private static Option<GroupChat> replay(
-      List<EventEnvelope<GroupChatEvent>> events, GroupChat base) {
+      List<EventEnvelope<GroupChatEvent>> envelopes, GroupChat base) {
     if (base != null) {
-      return Option.some(GroupChat.replay(Vector.ofAll(events).map(EventEnvelope::payload), base));
+      return Option.some(
+          GroupChat.replay(Vector.ofAll(envelopes).map(EventEnvelope::payload), base));
     }
-    if (events.isEmpty()) {
+    if (envelopes.isEmpty()) {
       return Option.none();
     }
-    if (!(events.get(0).payload() instanceof GroupChatEvent.Created created)) {
+    var first = envelopes.get(0);
+    if (!(first.payload() instanceof GroupChatEvent.Created created)) {
       throw new IllegalStateException(
           "the first event of an aggregate without a snapshot must be Created");
     }
     var initial =
         GroupChat.from(
-            created.aggregateId(),
+            GroupChatId.ofString(first.aggregateId().value()),
             false,
             created.name(),
             created.members(),
             Messages.ofEmpty(),
-            created.sequenceNumber(),
-            1);
-    var rest = Vector.ofAll(events.subList(1, events.size())).map(EventEnvelope::payload);
+            first.seqNr());
+    var rest = Vector.ofAll(envelopes.subList(1, envelopes.size())).map(EventEnvelope::payload);
     return Option.some(GroupChat.replay(rest, initial));
   }
 
@@ -111,6 +114,7 @@ public class GroupChatRepositoryImpl implements GroupChatRepository {
         .aggregateId(toAggregateId(event.aggregateId()))
         .seqNr(event.sequenceNumber())
         .occurredAt(event.occurredAt())
+        .manifest(event.manifest())
         .payload(event)
         .build();
   }
@@ -120,6 +124,7 @@ public class GroupChatRepositoryImpl implements GroupChatRepository {
     return SnapshotEnvelope.<GroupChat>builder()
         .aggregate(aggregate)
         .seqNr(event.sequenceNumber())
+        .manifest(SNAPSHOT_MANIFEST)
         .build();
   }
 
