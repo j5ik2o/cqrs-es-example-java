@@ -3,8 +3,13 @@ package com.github.j5ik2o.cqrs.es.java.query.interface_adaptor.graphql;
 import com.github.j5ik2o.cqrs.es.java.query.interface_adaptor.dao.GroupChatReadMapper;
 import com.github.j5ik2o.cqrs.es.java.query.interface_adaptor.dao.MemberReadMapper;
 import com.github.j5ik2o.cqrs.es.java.query.interface_adaptor.dao.MessageReadMapper;
+import graphql.GraphQLError;
+import graphql.GraphqlErrorBuilder;
+import graphql.schema.DataFetchingEnvironment;
+import java.util.Map;
 import org.springframework.context.annotation.Profile;
 import org.springframework.graphql.data.method.annotation.Argument;
+import org.springframework.graphql.data.method.annotation.GraphQlExceptionHandler;
 import org.springframework.graphql.data.method.annotation.QueryMapping;
 import org.springframework.stereotype.Controller;
 import reactor.core.publisher.Flux;
@@ -30,112 +35,109 @@ public class QueryResolverImpl implements QueryResolver {
 
   @QueryMapping
   @Override
-  public Mono<GroupChatOutput> getGroupChat(
-      @Argument("groupChatId") String groupChatId, @Argument("userAccountId") String userAccountId)
-      throws Exception {
-    return Mono.justOrEmpty(
+  public Mono<GroupChat> getGroupChat(
+      @Argument("groupChatId") String groupChatId,
+      @Argument("userAccountId") String userAccountId) {
+    var record =
         groupChatReadMapper
             .getGroupChat(groupChatId, userAccountId)
-            .map(
-                groupChatRecord ->
-                    new GroupChatOutput(
-                        groupChatRecord.id(),
-                        groupChatRecord.name(),
-                        groupChatRecord.ownerId(),
-                        groupChatRecord.createdAt(),
-                        groupChatRecord.updatedAt())));
+            .orElseThrow(() -> new ReadModelNotFoundException("GroupChat"));
+    return Mono.just(
+        new GroupChat(
+            record.id(), record.name(), record.ownerId(), record.createdAt(), record.updatedAt()));
   }
 
   @QueryMapping
   @Override
-  public Flux<GroupChatOutput> getGroupChats(@Argument("userAccountId") String userAccountId)
-      throws Exception {
-    return Flux.fromArray(
-        groupChatReadMapper.getGroupChats(userAccountId).stream()
-            .map(
-                groupChatRecord ->
-                    new GroupChatOutput(
-                        groupChatRecord.id(),
-                        groupChatRecord.name(),
-                        groupChatRecord.ownerId(),
-                        groupChatRecord.createdAt(),
-                        groupChatRecord.updatedAt()))
-            .toArray(GroupChatOutput[]::new));
+  public Flux<GroupChat> getGroupChats(@Argument("userAccountId") String userAccountId) {
+    return Flux.fromIterable(groupChatReadMapper.getGroupChats(userAccountId))
+        .map(
+            record ->
+                new GroupChat(
+                    record.id(),
+                    record.name(),
+                    record.ownerId(),
+                    record.createdAt(),
+                    record.updatedAt()));
   }
 
   @QueryMapping
   @Override
-  public Mono<MemberOutput> getMember(
-      @Argument("groupChatId") String groupChatId, @Argument("userAccountId") String userAccountId)
-      throws Exception {
-    return Mono.justOrEmpty(
+  public Mono<Member> getMember(
+      @Argument("groupChatId") String groupChatId,
+      @Argument("userAccountId") String userAccountId) {
+    var record =
         memberReadMapper
             .getMember(groupChatId, userAccountId)
-            .map(
-                memberRecord ->
-                    new MemberOutput(
-                        memberRecord.id(),
-                        memberRecord.groupChatId(),
-                        memberRecord.userAccountId(),
-                        memberRecord.role(),
-                        memberRecord.createdAt(),
-                        memberRecord.updatedAt())));
+            .orElseThrow(() -> new ReadModelNotFoundException("Member"));
+    return Mono.just(
+        new Member(
+            record.id(),
+            record.groupChatId(),
+            record.userAccountId(),
+            record.role(),
+            record.createdAt(),
+            record.updatedAt()));
   }
 
   @QueryMapping
   @Override
-  public Flux<MemberOutput> getMembers(
-      @Argument("groupChatId") String groupChatId, @Argument("userAccountId") String userAccountId)
-      throws Exception {
-    return Flux.just(
-        memberReadMapper.getMembers(groupChatId, userAccountId).stream()
-            .map(
-                memberRecord ->
-                    new MemberOutput(
-                        memberRecord.id(),
-                        memberRecord.groupChatId(),
-                        memberRecord.userAccountId(),
-                        memberRecord.role(),
-                        memberRecord.createdAt(),
-                        memberRecord.updatedAt()))
-            .toArray(MemberOutput[]::new));
+  public Flux<Member> getMembers(
+      @Argument("groupChatId") String groupChatId,
+      @Argument("userAccountId") String userAccountId) {
+    return Flux.fromIterable(memberReadMapper.getMembers(groupChatId, userAccountId))
+        .map(
+            record ->
+                new Member(
+                    record.id(),
+                    record.groupChatId(),
+                    record.userAccountId(),
+                    record.role(),
+                    record.createdAt(),
+                    record.updatedAt()));
   }
 
   @QueryMapping
   @Override
-  public Mono<MessageOutput> getMessage(
-      @Argument("messageId") String messageId, @Argument("userAccountId") String userAccountId)
-      throws Exception {
-    return Mono.justOrEmpty(
+  public Mono<Message> getMessage(
+      @Argument("messageId") String messageId, @Argument("userAccountId") String userAccountId) {
+    var record =
         messageReadMapper
             .getMessage(messageId, userAccountId)
-            .map(
-                messageRecord ->
-                    new MessageOutput(
-                        messageRecord.id(),
-                        messageRecord.groupChatId(),
-                        messageRecord.senderId(),
-                        messageRecord.content(),
-                        messageRecord.createdAt(),
-                        messageRecord.updatedAt())));
+            .orElseThrow(() -> new ReadModelNotFoundException("Message"));
+    return Mono.just(
+        new Message(
+            record.id(),
+            record.groupChatId(),
+            record.userAccountId(),
+            record.text(),
+            record.createdAt(),
+            record.updatedAt()));
   }
 
   @QueryMapping
   @Override
-  public Flux<MessageOutput> getMessages(
-      @Argument("groupChatId") String groupChatId, @Argument("userAccountId") String userAccountId)
-      throws Exception {
-    return Flux.just(
-        messageReadMapper.getMessages(groupChatId, userAccountId).stream()
-            .map(
-                messageRecord ->
-                    new MessageOutput(
-                        messageRecord.id(),
-                        messageRecord.groupChatId(),
-                        messageRecord.senderId(),
-                        messageRecord.content(),
-                        messageRecord.createdAt(),
-                        messageRecord.updatedAt()))
-            .toArray(MessageOutput[]::new));
+  public Flux<Message> getMessages(
+      @Argument("groupChatId") String groupChatId,
+      @Argument("userAccountId") String userAccountId) {
+    return Flux.fromIterable(messageReadMapper.getMessages(groupChatId, userAccountId))
+        .map(
+            record ->
+                new Message(
+                    record.id(),
+                    record.groupChatId(),
+                    record.userAccountId(),
+                    record.text(),
+                    record.createdAt(),
+                    record.updatedAt()));
+  }
+
+  @GraphQlExceptionHandler
+  public GraphQLError handleReadModelNotFound(
+      ReadModelNotFoundException exception, DataFetchingEnvironment environment) {
+    return GraphqlErrorBuilder.newError(environment)
+        .message(exception.getMessage())
+        .extensions(Map.of("code", "404"))
+        .build();
   }
 }

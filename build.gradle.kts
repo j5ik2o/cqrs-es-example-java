@@ -226,6 +226,9 @@ project(":command:processor") {
 
 project(":query:interface-adaptor") {
     apply(plugin = "io.github.kobylynskyi.graphql.codegen")
+    tasks.test {
+        enabled = true
+    }
     dependencies {
         implementation(project(":infrastructure"))
         implementation("io.projectreactor:reactor-core:3.8.8")
@@ -236,7 +239,8 @@ project(":query:interface-adaptor") {
         testImplementation("org.mybatis.spring.boot:mybatis-spring-boot-starter-test:4.1.0")
         testImplementation("org.flywaydb:flyway-core:13.12.1")
         testImplementation("org.flywaydb:flyway-mysql:13.12.1")
-        implementation("com.tailrocks.graphql:graphql-datetime-spring-boot-starter:6.0.0")
+        testImplementation("org.testcontainers:mysql:1.21.4")
+        testImplementation("mysql:mysql-connector-java:8.0.33")
     }
 
     tasks.named<GraphQLCodegenGradleTask>("graphqlCodegen") {
@@ -245,7 +249,7 @@ project(":query:interface-adaptor") {
         graphqlSchemaPaths = listOf("$projectDir/src/main/resources/graphql-read/schema.graphqls")
         outputDir = File("$projectDir/build/generated")
         packageName = "com.github.j5ik2o.cqrs.es.java.query.interface_adaptor.graphql"
-        customTypesMapping = mutableMapOf(Pair("LocalDateTime", "java.time.LocalDateTime"))
+        customTypesMapping = mutableMapOf(Pair("NaiveDateTime", "java.time.LocalDateTime"))
         customAnnotationsMapping =
             mutableMapOf(
                 Pair(
