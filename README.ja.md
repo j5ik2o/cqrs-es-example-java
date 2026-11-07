@@ -42,6 +42,8 @@ Please refer to [here](https://github.com/j5ik2o/cqrs-es-example) for implementa
 
 ローカルのRead Model UpdaterはheadテーブルのStreamsを購読する。重複した`seq_nr`と古い`seq_nr`は捨て、欠番はジャーナルから補う。処理済みの位置は、リードモデルの更新と同じデータベーストランザクションで`read_model_positions`に記録する。
 
+Lambda と SQS を使う AWS 向けのデプロイ資産と運用手順は [deploy/README.ja.md](deploy/README.ja.md) にある。
+
 ### System Architecture Diagram
 
 ![](docs/images/system-layout.png)

@@ -83,13 +83,24 @@ The position guard and the primary keys make applying the same event any number 
 
 ## Lambda settings
 
-For an AWS Lambda deployment, configure the event source mapping as follows. This repository has no Lambda deployment definition, so the settings are recorded here.
+`deploy/rmu-deployment.template.json` is a CloudFormation template for an AWS deployment. It creates the RMU function, the head-stream event source mapping, the OnFailure SQS queues, and an SQS-triggered recovery worker. This repository has no other AWS infrastructure as code, so the template is the single place that carries these settings. The runbook in `deploy/README.ja.md` covers the parameters, the apply procedure, post-deploy verification, and recovery operations.
+
+The event source mapping uses:
 
 - `BisectBatchOnFunctionError = true`
 - `FunctionResponseTypes = [ReportBatchItemFailures]`
-- `MaximumRetryAttempts` set to the desired count (for example 3); failures that exhaust it go to the `OnFailure` destination.
+- `MaximumRetryAttempts` (default 3); failures that exhaust it go to the `OnFailure` queue
+- `MaximumRecordAgeInSeconds` (default 604800)
+- `DestinationConfig.OnFailure` pointing at the OnFailure queue
+- `StartingPosition = TRIM_HORIZON`; the position guard drops the replayed records
 
 The handler is `com.github.j5ik2o.cqrs.es.java.rmu.ReadModelUpdater::handleRequest`. Its no-argument constructor builds the dependencies from environment variables, so Lambda can instantiate it directly. The required variables are `APP_STREAM_HEAD_TABLE_NAME`, `APP_STREAM_JOURNAL_TABLE_NAME`, `APP_STREAM_MAX_EVENTS_PER_TRANSACTION`, `APP_STREAM_RETRY_*`, `APP_DYNAMO_DB_*` (or `AWS_REGION`), `SPRING_DATASOURCE_URL`, `SPRING_DATASOURCE_USERNAME`, and `SPRING_DATASOURCE_PASSWORD`. The MySQL JDBC driver must be on the Lambda classpath. For DynamoDB Streams, the partial batch response's `itemIdentifier` is the record's sequence number. A failure that was recorded as a recovery task is not redelivered; only a failure to record the task is. While an aggregate has an earlier failed record, its later records are also redelivered, because the position rule forbids advancing past the unapplied event.
+
+## Recovery worker
+
+`com.github.j5ik2o.cqrs.es.java.rmu.RecoveryWorker::handleRequest` is the SQS entry point. One message wakes one recovery run, and the message body is ignored. The worker calls `RecoveryService.recoverPending(maxTasks)` and returns the messages as batch item failures when a run leaves tasks pending, so SQS retries and the queue's redrive policy eventually moves a poison message to the DLQ.
+
+`LambdaRmuDependencies` builds an `SqsRecoveryNotifier` when `APP_RECOVERY_QUEUE_URL` is set. The RMU sends a wake-up message after it records a task; the message carries identifiers only. The recovery queue's event source mapping uses `BatchSize = 1` and `ReportBatchItemFailures`, so a wake-up is not delayed by batching.
 
 ## Local configuration
 
@@ -124,8 +135,16 @@ The `rmu` tests cover:
 - returning a recovery task store write failure;
 - scanning the head table across multiple pages.
 
+The deployment asset has its own tests.
+
+- `RmuDeploymentTemplateTest` checks `BisectBatchOnFunctionError`, `ReportBatchItemFailures`, the OnFailure destination, the retry count, the function timeout, the recovery queue visibility timeout, both dead-letter queues, the handler names, and the environment retry defaults.
+- `ReadModelUpdaterHandlerTest` checks the partial batch response: only blocked records are redelivered, a failure to record the task is redelivered, skipped records produce no failure, and the item identifier falls back to the event id when the sequence number is missing.
+- `RecoveryWorkerTest` checks that a successful run deletes every message and a failed run redelivers every message.
+- `SqsRecoveryNotifierTest` checks that the wake-up message carries identifiers only.
+
 ## Remaining work
 
-- The Lambda event source mapping and SQS resources are not in this repository's deployment assets yet. The handler and the documented settings are in place.
-- `RecoveryNotifier` is the seam for SQS. The local reader reads the durable MySQL tasks directly.
+- The Lambda deployment package, containing both handlers and their dependencies, is not built by this repository. The template takes its S3 location as a parameter.
+- MySQL credentials are template parameters. A production deployment should read them from Secrets Manager or SSM Parameter Store.
+- The stack has not been deployed to AWS. CI validates the template and runs `RmuDeploymentTemplateTest`; it does not call AWS.
 - The e2e covers the happy path and restart replay; failure injection is covered by unit tests.

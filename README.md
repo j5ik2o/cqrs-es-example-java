@@ -44,6 +44,8 @@ The local Read Model Updater subscribes to the head table's Streams. It drops du
 `seq_nr` values, fills a gap from the journal, and records the applied position in
 `read_model_positions` in the same database transaction as the read model update.
 
+The AWS deployment asset and its runbook are in [deploy/README.ja.md](deploy/README.ja.md).
+
 ### System Architecture Diagram
 
 ![](docs/images/system-layout.png)

@@ -296,6 +296,7 @@ project(":rmu") {
         implementation("com.amazonaws:aws-lambda-java-core:1.4.1")
         implementation("io.github.j5ik2o:event-store-adapter-java:5.1.0")
         implementation("software.amazon.awssdk:dynamodb:2.57.11")
+        implementation("software.amazon.awssdk:sqs:2.57.11")
 
         implementation("com.fasterxml.jackson.core:jackson-databind:2.22.4")
         implementation("com.fasterxml.jackson.core:jackson-annotations:2.22")

@@ -1,0 +1,13 @@
+{
+  "CodeS3Bucket": "your-lambda-artifacts-bucket",
+  "CodeS3Key": "rmu/rmu-lambda.zip",
+  "HeadStreamArn": "arn:aws:dynamodb:ap-northeast-1:123456789012:table/head/stream/2026-01-01T00:00:00.000",
+  "HeadTableName": "head",
+  "JournalTableName": "journal",
+  "DataSourceUrl": "jdbc:mysql://db.example:3306/ceer",
+  "DataSourceUsername": "ceer",
+  "DataSourcePassword": "CHANGE_ME",
+  "VpcId": "",
+  "SubnetIds": "",
+  "SecurityGroupIds": ""
+}

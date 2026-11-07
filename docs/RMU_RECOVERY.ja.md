@@ -83,15 +83,26 @@ Scan では各ヘッドの `seq_nr` と投影の位置を比べ、位置が小�
 
 ## Lambda の設定
 
-Lambda で動かす場合は、イベントソースマッピングに次を設定する。このリポジトリには Lambda のデプロイ定義がないため、設定値はここに記録する。
+AWS にデプロイするための CloudFormation テンプレートを `deploy/rmu-deployment.template.json` に置いた。RMU の Lambda、head Streams のイベントソースマッピング、OnFailure の SQS、SQS で起動する復旧ワーカーを定義する。このリポジトリにはほかに AWS 側の構成を管理する仕組みがないため、これらの設定はこのテンプレートに集約する。パラメータ、適用手順、適用後の確認、復旧の運用手順は `deploy/README.ja.md` に書いた。
 
-- `BisectBatchOnFunctionError = true`: 失敗したレコードの範囲を分割して再試行する。
-- `FunctionResponseTypes = [ReportBatchItemFailures]`: 失敗したレコードだけを再配信する。
-- `MaximumRetryAttempts`: 必要な回数（例: 3）を設定し、それでも失敗したレコードは `OnFailure` の送信先へ流す。
+イベントソースマッピングには次を設定する。
+
+- `BisectBatchOnFunctionError = true`
+- `FunctionResponseTypes = [ReportBatchItemFailures]`
+- `MaximumRetryAttempts`（既定 3）。上限に達したレコードは `OnFailure` キューへ流す。
+- `MaximumRecordAgeInSeconds`（既定 604800 秒）
+- `DestinationConfig.OnFailure` に OnFailure キューを指定
+- `StartingPosition = TRIM_HORIZON`。再配信されたレコードは位置ガードが捨てる。
 
 ハンドラは `com.github.j5ik2o.cqrs.es.java.rmu.ReadModelUpdater::handleRequest` である。引数なしのコンストラクターが環境変数から依存関係を組み立てるため、Lambda はハンドラを直接生成できる。必要な環境変数は `APP_STREAM_HEAD_TABLE_NAME`、`APP_STREAM_JOURNAL_TABLE_NAME`、`APP_STREAM_MAX_EVENTS_PER_TRANSACTION`、`APP_STREAM_RETRY_*`、`APP_DYNAMO_DB_*`（または `AWS_REGION`）、`SPRING_DATASOURCE_URL`、`SPRING_DATASOURCE_USERNAME`、`SPRING_DATASOURCE_PASSWORD` である。MySQL の JDBC ドライバーを Lambda のクラスパスに入れること。
 
 部分バッチ応答の `itemIdentifier` には、DynamoDB Streams の仕様に合わせてレコードのシーケンス番号を入れる。復旧タスクに記録できた失敗は再配信しない。記録に失敗した場合だけ再配信する。同じ集約で先に失敗したレコードがある間は、後続のレコードも再配信対象にする。位置より先へ進めないためである。
+
+## 復旧ワーカー
+
+`com.github.j5ik2o.cqrs.es.java.rmu.RecoveryWorker::handleRequest` は SQS のエントリーポイントである。メッセージ 1 件で復旧を 1 回実行し、本文は使わない。ワーカーは `RecoveryService.recoverPending(maxTasks)` を呼び、未処理タスクが残ったときはメッセージをバッチの失敗として返す。SQS はこれを再配信し、キューの再試行上限に達したメッセージは DLQ へ移る。
+
+`LambdaRmuDependencies` は `APP_RECOVERY_QUEUE_URL` が設定されているとき `SqsRecoveryNotifier` を組み立てる。RMU は復旧タスクを記録したあと、識別子だけを含む起動メッセージを送る。復旧キューのイベントソースマッピングは `BatchSize = 1` と `ReportBatchItemFailures` を使う。バッチ待ちで復旧の起動が遅れないようにするためである。
 
 ## ローカルの設定
 
@@ -126,8 +137,16 @@ app:
 - 復旧タスクの書き込みに失敗したとき、その失敗を返す。
 - ヘッドの Scan が複数ページにまたがる。
 
+デプロイ資産にもテストを置いた。
+
+- `RmuDeploymentTemplateTest` は `BisectBatchOnFunctionError`、`ReportBatchItemFailures`、OnFailure の送信先、再試行回数、関数のタイムアウト、復旧キューの可視性タイムアウト、両方の DLQ、ハンドラ名、環境変数の再試行既定値を確認する。
+- `ReadModelUpdaterHandlerTest` は部分バッチ応答を確認する。失敗した集約の後続レコードだけを再配信し、復旧タスクの記録に失敗したレコードを再配信し、対象外のレコードでは失敗を返さず、シーケンス番号がないときはイベント ID を使う。
+- `RecoveryWorkerTest` は、成功した実行が全メッセージを削除し、失敗した実行が全メッセージを再配信することを確認する。
+- `SqsRecoveryNotifierTest` は、起動メッセージが識別子だけを含むことを確認する。
+
 ## 残課題
 
-- Lambda のイベントソースマッピングと SQS の実体は、このリポジトリのデプロイ資産にまだない。設定値とハンドラは実装済みである。
-- SQS への通知は `RecoveryNotifier` の差し込み口だけを用意している。ローカルの reader は DB の復旧タスクを直接読む。
+- RMU と復旧ワーカーの Lambda 配布物（両方のハンドラと依存ライブラリを含む）は、このリポジトリではまだ作らない。テンプレートは配布物の S3 の場所をパラメータで受け取る。
+- MySQL の認証情報はテンプレートの引数で渡している。本番では Secrets Manager か SSM Parameter Store から読む。
+- スタックはまだ AWS にデプロイしていない。CI はテンプレートの検証と `RmuDeploymentTemplateTest` の実行だけを行い、AWS は呼ばない。
 - e2e は正常系と再起動の再生を確認する。失敗の注入はユニットテストで確認している。
