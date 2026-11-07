@@ -3,27 +3,30 @@ package com.github.j5ik2o.cqrs.es.java.rmu;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
+import java.util.ArrayList;
 import org.junit.jupiter.api.Test;
 
 class DatabaseSettingsTest {
+  private static final String TEST_USER = "unit-test-user";
+  private static final String TEST_VALUE = "unit-test-value";
 
   @Test
   void readsCredentialsAndUrlFromTheSecret() {
     var settings =
         DatabaseSettings.fromSecretJson(
-            "{\"url\":\"jdbc:mysql://secret:3306/ceer\",\"username\":\"ceer\",\"password\":\"s3cret\"}",
+            secretJson("jdbc:mysql://secret:3306/ceer", TEST_USER, TEST_VALUE),
             "jdbc:mysql://env:3306/ceer");
 
     assertEquals("jdbc:mysql://secret:3306/ceer", settings.url());
-    assertEquals("ceer", settings.username());
-    assertEquals("s3cret", settings.password());
+    assertEquals(TEST_USER, settings.username());
+    assertEquals(TEST_VALUE, settings.password());
   }
 
   @Test
   void fallsBackToTheEnvironmentUrlWhenTheSecretHasNoUrl() {
     var settings =
         DatabaseSettings.fromSecretJson(
-            "{\"username\":\"ceer\",\"password\":\"s3cret\"}", "jdbc:mysql://env:3306/ceer");
+            secretJson(null, TEST_USER, TEST_VALUE), "jdbc:mysql://env:3306/ceer");
 
     assertEquals("jdbc:mysql://env:3306/ceer", settings.url());
   }
@@ -35,7 +38,7 @@ class DatabaseSettingsTest {
             IllegalStateException.class,
             () ->
                 DatabaseSettings.fromSecretJson(
-                    "{\"password\":\"s3cret\"}", "jdbc:mysql://env:3306/ceer"));
+                    secretJson(null, null, TEST_VALUE), "jdbc:mysql://env:3306/ceer"));
 
     assertEquals("database secret has no username", failure.getMessage());
   }
@@ -47,7 +50,7 @@ class DatabaseSettingsTest {
             IllegalStateException.class,
             () ->
                 DatabaseSettings.fromSecretJson(
-                    "{\"username\":\"ceer\"}", "jdbc:mysql://env:3306/ceer"));
+                    secretJson(null, TEST_USER, null), "jdbc:mysql://env:3306/ceer"));
 
     assertEquals("database secret has no password", failure.getMessage());
   }
@@ -56,9 +59,7 @@ class DatabaseSettingsTest {
   void rejectsASecretWithoutAUrlAndAFallback() {
     assertThrows(
         IllegalStateException.class,
-        () ->
-            DatabaseSettings.fromSecretJson(
-                "{\"username\":\"ceer\",\"password\":\"s3cret\"}", null));
+        () -> DatabaseSettings.fromSecretJson(secretJson(null, TEST_USER, TEST_VALUE), null));
   }
 
   @Test
@@ -82,5 +83,19 @@ class DatabaseSettingsTest {
   void rejectsAnEnvironmentWithoutAUrl() {
     assertThrows(
         IllegalStateException.class, () -> DatabaseSettings.fromEnvironment(null, "root", "root"));
+  }
+
+  private static String secretJson(String url, String username, String password) {
+    var fields = new ArrayList<String>();
+    if (url != null) {
+      fields.add("\"url\":\"" + url + "\"");
+    }
+    if (username != null) {
+      fields.add("\"username\":\"" + username + "\"");
+    }
+    if (password != null) {
+      fields.add("\"password\":\"" + password + "\"");
+    }
+    return "{" + String.join(",", fields) + "}";
   }
 }
