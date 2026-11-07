@@ -56,6 +56,17 @@ Please refer to [here](https://github.com/j5ik2o/cqrs-es-example) for implementa
 - [Debugging on Local Machine](docs/DEBUG_ON_LOCAL_MACHINE.ja.md)
 - [Debugging on Docker Compose](docs/DEBUG_ON_DOCKER_COMPOSE.ja.md)
 
+### エンドツーエンドテスト
+
+アプリケーションのイメージをビルドし、LocalStack を含む compose を起動して検証します。
+
+```sh
+./tools/scripts/docker-build.sh
+./tools/scripts/docker-compose-e2e-test.sh
+```
+
+スクリプトは LocalStack、MySQL、3 つのアプリ、e2e テストのコンテナを起動します。e2e テストの終了コードを返し、失敗時は compose のログを出力します。その後、Read Model Updater を再起動して同じテストをもう一度実行し、保持期間内の head Streams を再生してもリードモデルが重複しないことを確認します。
+
 ## Links
 
 - [Common Documents](https://github.com/j5ik2o/cqrs-es-example)

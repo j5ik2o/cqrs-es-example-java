@@ -23,8 +23,6 @@ services:
     depends_on:
       localstack:
         condition: service_healthy
-      dynamodb-admin:
-        condition: service_started
       dynamodb-setup:
         condition: service_completed_successfully
   read-model-updater-1:
@@ -50,8 +48,6 @@ services:
     depends_on:
       localstack:
         condition: service_healthy
-      dynamodb-admin:
-        condition: service_started
       dynamodb-setup:
         condition: service_completed_successfully
   read-api-server-1:
@@ -69,7 +65,11 @@ services:
       SPRING_DATASOURCE_USERNAME: ceer
       SPRING_DATASOURCE_PASSWORD: ceer
     depends_on:
-      - mysql
-      - refinery
-      - write-api-server-1
-      - read-model-updater-1
+      mysql:
+        condition: service_healthy
+      refinery:
+        condition: service_completed_successfully
+      write-api-server-1:
+        condition: service_started
+      read-model-updater-1:
+        condition: service_started
