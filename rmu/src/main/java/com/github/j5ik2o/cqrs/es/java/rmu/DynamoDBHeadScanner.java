@@ -50,6 +50,14 @@ public final class DynamoDBHeadScanner implements HeadScanner, StoreIdProvider {
     while (true) {
       var response = client.scan(request);
       for (var item : response.items()) {
+        var aggregateId = optionalString(item, "aid");
+        if (aggregateId == null
+            || CONFIG_AGGREGATE_ID.equals(aggregateId)
+            || !AggregateType.isGroupChat(aggregateId)) {
+          // A head of another aggregate type may not carry type_name or seq_nr. Skip it before
+          // parsing required fields so it cannot abort the whole scan.
+          continue;
+        }
         visitor.accept(toHead(item));
       }
       var lastEvaluatedKey = response.lastEvaluatedKey();
@@ -98,5 +106,10 @@ public final class DynamoDBHeadScanner implements HeadScanner, StoreIdProvider {
       throw new ReadModelUpdateException("head item has no " + name + " string");
     }
     return attribute.s();
+  }
+
+  private static String optionalString(Map<String, AttributeValue> item, String name) {
+    var attribute = item.get(name);
+    return attribute == null || attribute.s() == null ? null : attribute.s();
   }
 }

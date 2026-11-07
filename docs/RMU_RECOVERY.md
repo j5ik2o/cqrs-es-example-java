@@ -24,6 +24,8 @@ Failures fall into two groups.
 
 A permanent failure is recorded as a recovery task immediately. A transient failure is retried until the attempt or elapsed limit, then recorded. If recording the task fails, the failure is returned to the caller: losing the task would hide an event that cannot be applied.
 
+A single SQL statement is bounded by setting MyBatis `defaultStatementTimeout` to the retry's maximum elapsed time. A MySQL row lock wait lasts up to 50 seconds by default, so without a statement limit one operation can exceed the elapsed budget before the next attempt is checked.
+
 ## DLQ recovery tasks
 
 A failed event is stored in `read_model_recovery_tasks` by identifier only; the event body is never stored.
@@ -50,6 +52,8 @@ Recovery replays a task in this order.
 
 Reading the position first makes a second run of the same task a no-op. The local reader replays pending tasks at startup and once a minute.
 
+A recovery run handles at most 50 tasks. A task that fails updates `updated_at`, which moves it behind tasks that have not been attempted yet. A large backlog therefore does not stop stream polling, and the same failing tasks do not always take the front of the queue.
+
 ## Resync
 
 Following DY-15, the RMU scans the whole head table with a strongly consistent read (`ConsistentRead = true`) and skips `__config__` when:
@@ -59,6 +63,8 @@ Following DY-15, the RMU scans the whole head table with a strongly consistent r
 - the last processed position is older than the 24-hour stream retention window.
 
 The scan compares each head's `seq_nr` with the projection position and fills the laggards from the journal using the same guard as the stream path. Events that arrive from both the scan and the stream are deduplicated by the position guard.
+
+The reader does not start polling until the startup scan completes. If the scan fails, it backs off and retries the resync until it completes, so an aggregate that was not scanned is not left without a recovery task.
 
 `ExpiredIteratorException` only means the 15-minute shard iterator expired; it does not mean records were lost. The reader obtains a new iterator after the last processed sequence number (`AFTER_SEQUENCE_NUMBER`) instead of running a full resync.
 
@@ -71,6 +77,8 @@ The scan compares each head's `seq_nr` with the projection position and fills th
 - MySQL deadlock (1213) and lock wait timeout (1205) retry the whole transaction. The failed transaction has rolled back, so the retry cannot apply an event twice.
 - A journal gap fails without advancing the position. An aggregate with an unapplied event never moves past it.
 
+`openSession(false)` alone does not start a real transaction in MyBatis Spring's `SpringManagedTransaction`. The applier therefore drives the JDBC connection explicitly from the position-row lock to the commit, so the read model and the position commit together even on a Spring-managed connection.
+
 The position guard and the primary keys make applying the same event any number of times produce the same result.
 
 ## Lambda settings
@@ -81,7 +89,7 @@ For an AWS Lambda deployment, configure the event source mapping as follows. Thi
 - `FunctionResponseTypes = [ReportBatchItemFailures]`
 - `MaximumRetryAttempts` set to the desired count (for example 3); failures that exhaust it go to the `OnFailure` destination.
 
-The handler is `ReadModelUpdater#handleRequest`. For DynamoDB Streams, the partial batch response's `itemIdentifier` is the record's sequence number. A failure that was recorded as a recovery task is not redelivered; only a failure to record the task is. While an aggregate has an earlier failed record, its later records are also redelivered, because the position rule forbids advancing past the unapplied event.
+The handler is `com.github.j5ik2o.cqrs.es.java.rmu.ReadModelUpdater::handleRequest`. Its no-argument constructor builds the dependencies from environment variables, so Lambda can instantiate it directly. The required variables are `APP_STREAM_HEAD_TABLE_NAME`, `APP_STREAM_JOURNAL_TABLE_NAME`, `APP_STREAM_MAX_EVENTS_PER_TRANSACTION`, `APP_STREAM_RETRY_*`, `APP_DYNAMO_DB_*` (or `AWS_REGION`), `SPRING_DATASOURCE_URL`, `SPRING_DATASOURCE_USERNAME`, and `SPRING_DATASOURCE_PASSWORD`. The MySQL JDBC driver must be on the Lambda classpath. For DynamoDB Streams, the partial batch response's `itemIdentifier` is the record's sequence number. A failure that was recorded as a recovery task is not redelivered; only a failure to record the task is. While an aggregate has an earlier failed record, its later records are also redelivered, because the position rule forbids advancing past the unapplied event.
 
 ## Local configuration
 

@@ -48,6 +48,17 @@ public class ReadModelUpdater {
     this(new Applier(sqlSessionFactory, journalReader, 1), null, RetryPolicy.noRetry());
   }
 
+  /**
+   * Lambda entry point. Lambda instantiates the handler class with a no-argument constructor, so
+   * this constructor builds the dependencies from environment variables.
+   */
+  public ReadModelUpdater() {
+    var dependencies = LambdaRmuDependencies.create();
+    this.applier = dependencies.applier();
+    this.recovery = dependencies.recoveryService();
+    this.retryPolicy = dependencies.retryPolicy();
+  }
+
   @Autowired
   public ReadModelUpdater(EventApplier applier, RecoveryService recovery, RetryPolicy retryPolicy) {
     this.applier = applier;
@@ -107,10 +118,26 @@ public class ReadModelUpdater {
   }
 
   private RecordResult processRecord(DynamodbEvent.DynamodbStreamRecord record) {
-    var identity = parseHeadRecord(record);
+    RecordIdentity identity;
+    try {
+      identity = parseHeadRecord(record);
+    } catch (RuntimeException e) {
+      var fallback = fallbackIdentity(record);
+      if (recovery != null && fallback != null && isRecoverable(e)) {
+        LOGGER.error(
+            "Failed to parse a head record; recorded a recovery task: aid={}, seqNr={}",
+            fallback.aggregateId(),
+            fallback.headSeqNr(),
+            e);
+        recovery.record(fallback.aggregateId(), fallback.headSeqNr(), fallback.headSeqNr(), e);
+        return RecordResult.RECORDED_FAILURE;
+      }
+      throw e;
+    }
     if (identity.skip()) {
       return RecordResult.APPLIED;
     }
+    var lastSeqNr = identity.events().get(identity.events().size() - 1).seqNr();
     for (var headEvent : identity.events()) {
       try {
         retryPolicy.run(() -> applier.applyHeadEvent(identity.aggregateId(), headEvent));
@@ -118,11 +145,30 @@ public class ReadModelUpdater {
         if (recovery == null || !isRecoverable(e)) {
           throw e;
         }
-        recovery.record(identity.aggregateId(), headEvent.seqNr(), e);
+        // A record can carry several events. Recovery must reach the record's last event,
+        // otherwise the events after the failed one wait for another record or a resync.
+        recovery.record(identity.aggregateId(), lastSeqNr, headEvent.seqNr(), e);
         return RecordResult.RECORDED_FAILURE;
       }
     }
     return RecordResult.APPLIED;
+  }
+
+  private static HeadIdentity fallbackIdentity(DynamodbEvent.DynamodbStreamRecord record) {
+    try {
+      var streamRecord = record.getDynamodb();
+      if (streamRecord == null || streamRecord.getNewImage() == null) {
+        return null;
+      }
+      var image = streamRecord.getNewImage();
+      var aggregateId = getStringAttribute(image, "aid");
+      if (!AggregateType.isGroupChat(aggregateId)) {
+        return null;
+      }
+      return new HeadIdentity(aggregateId, getNumberAttribute(image, "seq_nr"));
+    } catch (RuntimeException e) {
+      return null;
+    }
   }
 
   private static boolean isRecoverable(Throwable failure) {
@@ -148,7 +194,11 @@ public class ReadModelUpdater {
       LOGGER.debug("Skipping head record of another aggregate type: aid={}", aggregateId);
       return RecordIdentity.skipped();
     }
-    return new RecordIdentity(false, aggregateId, parseHeadEvents(image));
+    var events = parseHeadEvents(image);
+    if (events.isEmpty()) {
+      throw PermanentFailure.permanent(FailureKind.EVENT_PAYLOAD, "head record has no events");
+    }
+    return new RecordIdentity(false, aggregateId, events);
   }
 
   private static String aggregateIdOf(DynamodbEvent.DynamodbStreamRecord record) {
@@ -263,4 +313,6 @@ public class ReadModelUpdater {
       return new RecordIdentity(true, null, List.of());
     }
   }
+
+  private record HeadIdentity(String aggregateId, long headSeqNr) {}
 }

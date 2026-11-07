@@ -24,6 +24,8 @@ Read Model Updater（RMU）は head テーブルの Streams を購読して MySQ
 
 恒久的な失敗は再試行せず、すぐに復旧タスクへ記録する。一時的な失敗は上限まで再試行し、上限に達したら同じく復旧タスクへ記録する。記録に失敗した場合は、その失敗を呼び出し元へ返す。復旧タスクを失うと、直らないイベントを見落とすためである。
 
+1 回の SQL 文は、再試行の最大経過時間と同じ値を MyBatis の `defaultStatementTimeout` として設定する。MySQL の行ロック待ちは既定で最大 50 秒続くため、文の実行そのものにも上限を設けないと、次の試行の前に経過時間の上限を超えてしまう。
+
 ## DLQ（復旧タスク）
 
 失敗したイベントは、イベント本文を持たず、識別子だけを `read_model_recovery_tasks` に保存する。
@@ -50,6 +52,8 @@ SQS を使う場合は、復旧ワーカーを起こすためだけに使い、�
 
 位置を先に読み直すため、同じタスクを 2 回実行しても結果は変わらない。ローカルの reader は起動時と 1 分ごとに `pending` のタスクを処理する。
 
+復旧処理は 1 回に最大 50 件を対象にする。失敗したタスクは `updated_at` を更新して待ち行列の後ろへ移す。これにより、大量の未処理タスクがストリームのポーリングを止め続けたり、同じ失敗タスクだけが毎回先頭に来たりしない。
+
 ## 再同期
 
 DY-15 に従い、次の場合に head テーブルを強整合読み取り（`ConsistentRead = true`）で全件 Scan する。`__config__` は除外する。
@@ -59,6 +63,8 @@ DY-15 に従い、次の場合に head テーブルを強整合読み取り（`C
 - 最後に処理した位置が Streams の保持期間（24 時間）より古いとき
 
 Scan では各ヘッドの `seq_nr` と投影の位置を比べ、位置が小さい集約だけ journal から補う。補う処理は通常の適用と同じ位置ガードを使う。Scan と Streams の両方から届いたイベントは、位置ガードで重複を捨てる。
+
+起動時の Scan が完了するまでストリームの購読は始めない。Scan が失敗したときはバックオフして、完了するまで再同期をやり直す。走査できなかった集約を、復旧タスクがないまま見落とさないためである。
 
 `ExpiredIteratorException` は、シャードイテレーターの有効期限（15 分）が切れただけであり、レコードが消えたことを意味しない。この場合は全件再同期をせず、最後に処理したシーケンス番号の後から（`AFTER_SEQUENCE_NUMBER`）イテレーターを取り直す。
 
@@ -71,6 +77,8 @@ Scan では各ヘッドの `seq_nr` と投影の位置を比べ、位置が小�
 - デッドロック（MySQL 1213）とロック待ちタイムアウト（1205）は、トランザクションを丸ごとやり直す。失敗したトランザクションはロールバック済みなので、やり直しても二重適用にはならない。
 - journal に欠番があれば、位置を進めずに失敗とする。未適用のイベントがある集約は、その位置より先へ進めない。
 
+`openSession(false)` だけでは、MyBatis Spring の `SpringManagedTransaction` は実際のトランザクションを開始しない。そのため、位置行のロックからコミットまでを JDBC の接続で明示的に囲む。これで Spring 管理の接続でも、リードモデルと位置が同じトランザクションで確定する。
+
 同じイベントを何度適用しても結果が変わらないことは、位置ガードと主キーで担保する。
 
 ## Lambda の設定
@@ -81,7 +89,9 @@ Lambda で動かす場合は、イベントソースマッピングに次を設�
 - `FunctionResponseTypes = [ReportBatchItemFailures]`: 失敗したレコードだけを再配信する。
 - `MaximumRetryAttempts`: 必要な回数（例: 3）を設定し、それでも失敗したレコードは `OnFailure` の送信先へ流す。
 
-ハンドラは `ReadModelUpdater#handleRequest` である。部分バッチ応答の `itemIdentifier` には、DynamoDB Streams の仕様に合わせてレコードのシーケンス番号を入れる。復旧タスクに記録できた失敗は再配信しない。記録に失敗した場合だけ再配信する。同じ集約で先に失敗したレコードがある間は、後続のレコードも再配信対象にする。位置より先へ進めないためである。
+ハンドラは `com.github.j5ik2o.cqrs.es.java.rmu.ReadModelUpdater::handleRequest` である。引数なしのコンストラクターが環境変数から依存関係を組み立てるため、Lambda はハンドラを直接生成できる。必要な環境変数は `APP_STREAM_HEAD_TABLE_NAME`、`APP_STREAM_JOURNAL_TABLE_NAME`、`APP_STREAM_MAX_EVENTS_PER_TRANSACTION`、`APP_STREAM_RETRY_*`、`APP_DYNAMO_DB_*`（または `AWS_REGION`）、`SPRING_DATASOURCE_URL`、`SPRING_DATASOURCE_USERNAME`、`SPRING_DATASOURCE_PASSWORD` である。MySQL の JDBC ドライバーを Lambda のクラスパスに入れること。
+
+部分バッチ応答の `itemIdentifier` には、DynamoDB Streams の仕様に合わせてレコードのシーケンス番号を入れる。復旧タスクに記録できた失敗は再配信しない。記録に失敗した場合だけ再配信する。同じ集約で先に失敗したレコードがある間は、後続のレコードも再配信対象にする。位置より先へ進めないためである。
 
 ## ローカルの設定
 

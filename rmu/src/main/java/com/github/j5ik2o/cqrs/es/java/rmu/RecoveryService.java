@@ -1,7 +1,6 @@
 package com.github.j5ik2o.cqrs.es.java.rmu;
 
 import java.time.Instant;
-import java.util.ArrayList;
 import java.util.List;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -14,6 +13,7 @@ import org.slf4j.LoggerFactory;
  */
 public final class RecoveryService {
   private static final Logger LOGGER = LoggerFactory.getLogger(RecoveryService.class);
+  private static final int DEFAULT_MAX_TASKS_PER_RUN = 50;
 
   private final RecoveryTaskStore taskStore;
   private final StoreIdProvider storeIdProvider;
@@ -31,23 +31,31 @@ public final class RecoveryService {
     this.notifier = notifier;
   }
 
+  public void record(String aggregateId, long targetSeqNr, Throwable failure) {
+    record(aggregateId, targetSeqNr, targetSeqNr, failure);
+  }
+
   /**
-   * Persists a recovery task. A failure here is returned to the caller on purpose: losing the task
-   * would hide a permanently failing event.
+   * Persists a recovery task. {@code targetSeqNr} is the position recovery must reach; {@code
+   * failedSeqNr} is the event that failed and is kept in the message for diagnosis. A failure here
+   * is returned to the caller on purpose: losing the task would hide a permanently failing event.
    */
-  public void record(String aggregateId, long seqNr, Throwable failure) {
+  public void record(String aggregateId, long targetSeqNr, long failedSeqNr, Throwable failure) {
     var kind = FailureClassifier.classify(failure).orElse(FailureKind.UNKNOWN);
     var storeId = storeIdProvider.storeId();
     var now = Instant.now();
+    var message =
+        "failed at seq_nr %d: %s"
+            .formatted(failedSeqNr, failure == null ? "" : failure.getMessage());
     var task =
         new RecoveryTask(
             storeId,
             Projection.NAME,
             Projection.VERSION,
             aggregateId,
-            seqNr,
+            targetSeqNr,
             kind,
-            failure == null ? "" : failure.getMessage(),
+            message,
             RecoveryTask.STATUS_PENDING,
             now,
             now);
@@ -58,7 +66,8 @@ public final class RecoveryService {
       } catch (RuntimeException e) {
         // The durable task already exists. A notification failure only means the worker is not
         // woken immediately; the next recovery run still sees the task.
-        LOGGER.warn("Failed to notify a recovery task: aid={}, seqNr={}", aggregateId, seqNr, e);
+        LOGGER.warn(
+            "Failed to notify a recovery task: aid={}, seqNr={}", aggregateId, targetSeqNr, e);
       }
     }
   }
@@ -68,6 +77,12 @@ public final class RecoveryService {
    * finds the position at or beyond the task and only marks the task complete.
    */
   public void recover(RecoveryTask task) {
+    var storeId = storeIdProvider.storeId();
+    if (!belongsToCurrentProjection(task, storeId)) {
+      throw new RecoveryException(
+          "recovery task belongs to another store or projection: storeId=%s, projection=%s@%s"
+              .formatted(task.storeId(), task.projectionName(), task.projectionVersion()));
+    }
     var position = applier.position(task.aggregateId());
     if (position < task.seqNr()) {
       applier.applyThrough(task.aggregateId(), task.seqNr());
@@ -82,16 +97,42 @@ public final class RecoveryService {
         task.storeId(), task.projectionName(), task.aggregateId(), task.seqNr());
   }
 
-  /** Replays every pending task. One failing aggregate does not stop the others. */
+  /** Replays at most one bounded batch of pending tasks. */
   public int recoverPending() {
+    return recoverPending(DEFAULT_MAX_TASKS_PER_RUN);
+  }
+
+  /**
+   * Replays a bounded number of pending tasks so a large backlog does not stop stream polling. A
+   * task that fails is marked as retried, which moves it behind tasks that have not been attempted
+   * yet. The task stays pending for the next run.
+   */
+  public int recoverPending(int maxTasks) {
+    var storeId = storeIdProvider.storeId();
     var tasks = taskStore.listPending();
     var completed = 0;
+    var processed = 0;
     RuntimeException failure = null;
-    for (var task : new ArrayList<>(tasks)) {
+    for (var task : tasks) {
+      if (processed >= maxTasks) {
+        break;
+      }
+      if (!belongsToCurrentProjection(task, storeId)) {
+        LOGGER.warn(
+            "Skipping a recovery task from another store or projection: storeId={}, projection={}@{}",
+            task.storeId(),
+            task.projectionName(),
+            task.projectionVersion());
+        continue;
+      }
+      processed++;
       try {
         recover(task);
         completed++;
+      } catch (RetryInterruptedException e) {
+        throw e;
       } catch (RuntimeException e) {
+        markFailed(task, e);
         if (failure == null) {
           failure = new RecoveryException("some recovery tasks remain pending", e);
         } else {
@@ -107,5 +148,19 @@ public final class RecoveryService {
 
   public List<RecoveryTask> pendingTasks() {
     return taskStore.listPending();
+  }
+
+  private static boolean belongsToCurrentProjection(RecoveryTask task, String storeId) {
+    return storeId.equals(task.storeId())
+        && Projection.NAME.equals(task.projectionName())
+        && Projection.VERSION.equals(task.projectionVersion());
+  }
+
+  private void markFailed(RecoveryTask task, RuntimeException failure) {
+    try {
+      taskStore.markFailed(task, failure);
+    } catch (RuntimeException markError) {
+      failure.addSuppressed(markError);
+    }
   }
 }

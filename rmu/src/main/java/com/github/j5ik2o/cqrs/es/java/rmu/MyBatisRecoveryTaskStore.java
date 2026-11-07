@@ -58,6 +58,22 @@ public final class MyBatisRecoveryTaskStore implements RecoveryTaskStore {
     }
   }
 
+  @Override
+  public void markFailed(RecoveryTask task, Throwable failure) {
+    try (var session = sqlSessionFactory.openSession(true)) {
+      session
+          .getMapper(RecoveryTaskMapper.class)
+          .markFailed(
+              task.storeId(),
+              task.projectionName(),
+              task.aggregateId(),
+              task.seqNr(),
+              "recovery attempt failed: "
+                  + (failure == null || failure.getMessage() == null ? "" : failure.getMessage()),
+              Instant.now());
+    }
+  }
+
   private static RecoveryTask toTask(Map<String, Object> row) {
     return new RecoveryTask(
         stringValue(row, "store_id"),

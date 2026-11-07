@@ -135,6 +135,13 @@ final class RmuTestSupport {
     return record(aggregateId, eventName, newImage);
   }
 
+  static DynamodbEvent headRecordWithoutEvents(String aggregateId, long seqNr) {
+    var image = new LinkedHashMap<String, AttributeValue>();
+    image.put("aid", stringValue(aggregateId));
+    image.put("seq_nr", numberValue(seqNr));
+    return record(aggregateId, "MODIFY", image);
+  }
+
   static DynamodbEvent record(
       String aggregateId, String eventName, Map<String, AttributeValue> newImage) {
     var streamRecord =
@@ -214,6 +221,11 @@ final class RmuTestSupport {
                   && task.projectionName().equals(projectionName)
                   && task.aggregateId().equals(aggregateId)
                   && task.seqNr() == seqNr);
+    }
+
+    @Override
+    public void markFailed(RecoveryTask task, Throwable failure) {
+      // Keep the task pending; the next run retries it.
     }
   }
 

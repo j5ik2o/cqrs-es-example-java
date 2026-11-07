@@ -11,8 +11,8 @@ import com.github.j5ik2o.cqrs.es.java.rmu.dao.MessageRecord;
 import com.github.j5ik2o.cqrs.es.java.rmu.dao.MessageWriteMapper;
 import com.github.j5ik2o.cqrs.es.java.rmu.dao.ReadModelPositionMapper;
 import com.github.j5ik2o.event.store.adapter.java.core.SerializationException;
+import java.sql.SQLException;
 import java.time.Instant;
-import java.util.ArrayList;
 import java.util.List;
 import org.apache.ibatis.session.SqlSession;
 import org.apache.ibatis.session.SqlSessionFactory;
@@ -63,8 +63,6 @@ public final class Applier implements EventApplier {
     if (event.seqNr() <= currentPosition) {
       return;
     }
-
-    var pending = new ArrayList<HeadEvent>();
     if (event.seqNr() > currentPosition + 1) {
       if (journalReader == null) {
         throw PermanentFailure.permanent(
@@ -72,13 +70,11 @@ public final class Applier implements EventApplier {
             "aggregate %s: seq_nr %d follows position %d and no journal reader is configured"
                 .formatted(aggregateId, event.seqNr(), currentPosition));
       }
-      var journalEvents =
-          journalReader.readEvents(aggregateId, currentPosition + 1, event.seqNr() - 1);
-      requireContiguous(currentPosition + 1, event.seqNr() - 1, journalEvents);
-      pending.addAll(journalEvents);
+      // Read and apply the gap in bounded chunks. A head far ahead of the position must not
+      // accumulate every missing event in memory before anything is committed.
+      applyThrough(aggregateId, event.seqNr() - 1);
     }
-    pending.add(event);
-    applyEvents(groupChatId, pending);
+    applyEvents(aggregateId, groupChatId, List.of(event));
   }
 
   @Override
@@ -101,7 +97,7 @@ public final class Applier implements EventApplier {
       var endSeqNr = Math.min(currentPosition + readAheadEvents, targetSeqNr);
       var journalEvents = journalReader.readEvents(aggregateId, currentPosition + 1, endSeqNr);
       requireContiguous(currentPosition + 1, endSeqNr, journalEvents);
-      applyEvents(groupChatId, journalEvents);
+      applyEvents(aggregateId, groupChatId, journalEvents);
       var after = position(aggregateId);
       if (after <= currentPosition) {
         throw new ReadModelUpdateException(
@@ -111,12 +107,12 @@ public final class Applier implements EventApplier {
     }
   }
 
-  private void applyEvents(GroupChatId groupChatId, List<HeadEvent> events) {
+  private void applyEvents(String aggregateId, GroupChatId groupChatId, List<HeadEvent> events) {
     for (var from = 0; from < events.size(); from += maxEventsPerTransaction) {
       var to = Math.min(from + maxEventsPerTransaction, events.size());
       var batch = events.subList(from, to);
       processInTransaction(
-          groupChatId.asString(),
+          aggregateId,
           (session, current) -> {
             var next = current;
             for (var event : batch) {
@@ -154,23 +150,50 @@ public final class Applier implements EventApplier {
   private void doProcessInTransaction(String aggregateId, PositionedWork work) {
     try (var session = sqlSessionFactory.openSession(false)) {
       try {
-        var positionMapper = session.getMapper(ReadModelPositionMapper.class);
-        positionMapper.insertIfAbsent(aggregateId, Instant.now());
-        var currentValue = positionMapper.selectSeqNrForUpdate(aggregateId);
-        var current = currentValue == null ? 0L : currentValue;
-        var next = work.apply(session, current);
-        if (next != current) {
-          positionMapper.upsert(aggregateId, next, Instant.now());
+        var connection = session.getConnection();
+        var originalAutoCommit = connection.getAutoCommit();
+        if (originalAutoCommit) {
+          // MyBatis Spring's SpringManagedTransaction does not start a transaction when no Spring
+          // transaction is active, so openSession(false) alone is not enough. Drive the JDBC
+          // connection so the position row and the read model change really commit together.
+          connection.setAutoCommit(false);
         }
-        session.commit();
-      } catch (RuntimeException | Error e) {
         try {
-          session.rollback();
-        } catch (RuntimeException rollbackError) {
-          e.addSuppressed(rollbackError);
+          var positionMapper = session.getMapper(ReadModelPositionMapper.class);
+          positionMapper.insertIfAbsent(aggregateId, Instant.now());
+          var currentValue = positionMapper.selectSeqNrForUpdate(aggregateId);
+          var current = currentValue == null ? 0L : currentValue;
+          var next = work.apply(session, current);
+          if (next != current) {
+            positionMapper.upsert(aggregateId, next, Instant.now());
+          }
+          connection.commit();
+        } catch (SQLException e) {
+          rollbackQuietly(connection, e);
+          throw new ReadModelUpdateException("failed to commit the read model transaction", e);
+        } catch (RuntimeException | Error e) {
+          rollbackQuietly(connection, e);
+          throw e;
+        } finally {
+          if (originalAutoCommit) {
+            try {
+              connection.setAutoCommit(true);
+            } catch (SQLException ignored) {
+              // The pool resets the connection when the session closes.
+            }
+          }
         }
-        throw e;
+      } catch (SQLException e) {
+        throw new ReadModelUpdateException("failed to manage the read model transaction", e);
       }
+    }
+  }
+
+  private static void rollbackQuietly(java.sql.Connection connection, Throwable failure) {
+    try {
+      connection.rollback();
+    } catch (SQLException rollbackError) {
+      failure.addSuppressed(rollbackError);
     }
   }
 

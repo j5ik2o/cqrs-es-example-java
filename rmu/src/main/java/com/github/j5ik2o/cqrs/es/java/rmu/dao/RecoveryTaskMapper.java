@@ -40,8 +40,21 @@ public interface RecoveryTaskMapper {
   @Select(
       "SELECT store_id, projection_name, projection_version, aggregate_id, seq_nr, failure_type, "
           + "error_message, status FROM read_model_recovery_tasks "
-          + "WHERE status = 'pending' ORDER BY created_at, aggregate_id, seq_nr")
+          + "WHERE status = 'pending' ORDER BY updated_at, aggregate_id, seq_nr")
   List<Map<String, Object>> selectPending();
+
+  @Update(
+      "UPDATE read_model_recovery_tasks SET error_message = #{errorMessage}, "
+          + "updated_at = #{updatedAt} "
+          + "WHERE store_id = #{storeId} AND projection_name = #{projectionName} "
+          + "AND aggregate_id = #{aggregateId} AND seq_nr = #{seqNr}")
+  int markFailed(
+      @Param("storeId") String storeId,
+      @Param("projectionName") String projectionName,
+      @Param("aggregateId") String aggregateId,
+      @Param("seqNr") long seqNr,
+      @Param("errorMessage") String errorMessage,
+      @Param("updatedAt") Instant updatedAt);
 
   @Update(
       "UPDATE read_model_recovery_tasks SET status = 'completed', updated_at = #{updatedAt} "

@@ -27,6 +27,8 @@ public final class HeadStreamPoller {
     void handle(DynamodbEvent.DynamodbStreamRecord record);
   }
 
+  private static final int MAX_PAGES_PER_SHARD = 10;
+
   private final HeadStreamClient client;
   private final StreamRecordHandler handler;
   private final int maxItemCount;
@@ -57,8 +59,13 @@ public final class HeadStreamPoller {
         }
         var iterator = iterators.get(shardId);
         if (iterator == null) {
-          iterator = client.shardIteratorAtTrimHorizon(streamArn, shardId);
+          try {
+            iterator = client.shardIteratorAtTrimHorizon(streamArn, shardId);
+          } catch (TrimmedDataAccessException e) {
+            throw new StreamTrimmedException(shardId, e);
+          }
         }
+        var pages = 0;
         while (iterator != null) {
           StreamRecordPage page;
           try {
@@ -69,11 +76,16 @@ public final class HeadStreamPoller {
                     + "shardId={}, sequenceNumber={}",
                 shardId,
                 lastSequenceNumbers.get(shardId));
-            iterator = nextIteratorAfterLastSequence(streamArn, shardId);
+            try {
+              iterator = nextIteratorAfterLastSequence(streamArn, shardId);
+            } catch (TrimmedDataAccessException trimmed) {
+              throw new StreamTrimmedException(shardId, trimmed);
+            }
             continue;
           } catch (TrimmedDataAccessException e) {
             throw new StreamTrimmedException(shardId, e);
           }
+          pages++;
           for (var index = 0; index < page.records().size(); index++) {
             handler.handle(page.records().get(index));
             lastSequenceNumbers.put(shardId, page.sequenceNumbers().get(index));
@@ -90,7 +102,9 @@ public final class HeadStreamPoller {
           }
           iterators.put(shardId, nextIterator);
           iterator = nextIterator;
-          if (page.records().isEmpty()) {
+          if (page.records().isEmpty() || pages >= MAX_PAGES_PER_SHARD) {
+            // A busy shard must not starve the other shards or the periodic recovery run. The
+            // iterator is saved, so the next poll continues from here.
             break;
           }
         }

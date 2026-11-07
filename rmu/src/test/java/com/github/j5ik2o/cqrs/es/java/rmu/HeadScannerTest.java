@@ -74,6 +74,9 @@ class HeadScannerTest {
     putHead("GroupChat-01H42K4ABWQ5V2XQEP3A48VE0Z", 3);
     putHead("GroupChat-01H42K4ABWQ5V2XQEP3A48VE0Y", 7);
     putHead("GroupChat-01H42K4ABWQ5V2XQEP3A48VE0X", 11);
+    // Another aggregate type may not carry type_name or seq_nr. The scan must skip it without
+    // aborting the GroupChat heads that follow.
+    putRawHead("UserAccount-01H42K4ABWQ5V2XQEP3A48VE0W");
   }
 
   @AfterAll
@@ -84,7 +87,7 @@ class HeadScannerTest {
   }
 
   @Test
-  void scansEveryPageAndExcludesTheConfigurationItem() {
+  void scansEveryPageAndSkipsItemsOutsideTheProjection() {
     var scanner = new DynamoDBHeadScanner(client, HEAD_TABLE_NAME, 1);
     var heads = new ArrayList<Head>();
 
@@ -108,6 +111,14 @@ class HeadScannerTest {
                     "aid", AttributeValue.fromS(aggregateId),
                     "type_name", AttributeValue.fromS("GroupChat"),
                     "seq_nr", AttributeValue.fromN(Long.toString(seqNr))))
+            .build());
+  }
+
+  private static void putRawHead(String aggregateId) {
+    client.putItem(
+        PutItemRequest.builder()
+            .tableName(HEAD_TABLE_NAME)
+            .item(Map.of("aid", AttributeValue.fromS(aggregateId)))
             .build());
   }
 }

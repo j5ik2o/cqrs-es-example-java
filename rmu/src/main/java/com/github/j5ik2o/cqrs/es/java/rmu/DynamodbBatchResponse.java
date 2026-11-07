@@ -5,8 +5,9 @@ import java.util.List;
 /**
  * The partial-batch response for a DynamoDB Streams event source mapping.
  *
- * <p>The event source mapping must enable {@code ReportBatchItemFailures} and {@code
- * BisectBatchOnFunctionError}; otherwise Lambda retries the whole batch.
+ * <p>The event source mapping must enable {@code ReportBatchItemFailures} to process this response.
+ * Otherwise Lambda ignores the failure list. {@code BisectBatchOnFunctionError} is a separate
+ * setting that controls batch splitting.
  */
 public record DynamodbBatchResponse(List<BatchItemFailure> batchItemFailures) {
   public static DynamodbBatchResponse empty() {

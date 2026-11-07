@@ -60,11 +60,17 @@ public final class FailureClassifier {
     if (classify(failure).isPresent()) {
       return false;
     }
-    if (failure instanceof InterruptedException
-        || failure instanceof InterruptedIOException
-        || failure instanceof CancellationException
-        || failure instanceof RetryInterruptedException) {
+    if (failure instanceof InterruptedIOException) {
       return false;
+    }
+    // An interrupt wrapped by the AWS SDK or another layer is still an interrupt, not a storage
+    // outage. Stop retrying and let the interruption propagate.
+    for (var cause = failure; cause != null; cause = cause.getCause()) {
+      if (cause instanceof InterruptedException
+          || cause instanceof CancellationException
+          || cause instanceof RetryInterruptedException) {
+        return false;
+      }
     }
     for (var cause = failure; cause != null; cause = cause.getCause()) {
       if (cause instanceof SQLException sqlException) {
@@ -82,9 +88,7 @@ public final class FailureClassifier {
           return true;
         }
       }
-      if (cause instanceof IOException
-          || cause instanceof TimeoutException
-          || cause instanceof InterruptedException) {
+      if (cause instanceof IOException || cause instanceof TimeoutException) {
         return true;
       }
     }

@@ -2,6 +2,7 @@ package com.github.j5ik2o.cqrs.es.java.rmu;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import java.util.List;
 import java.util.function.Consumer;
@@ -78,6 +79,16 @@ class ResyncTest extends AbstractRmuDatabaseTest {
     assertEquals(2L, positionOf(broken.aid()));
     assertEquals(2, count("SELECT COUNT(*) FROM members WHERE group_chat_id = ?", broken.aid()));
     assertEquals(0, store.listPending().size());
+  }
+
+  @Test
+  void returnsTheOriginalFailureWhenNoRecoveryServiceIsConfigured() {
+    var fixture = RmuTestSupport.createFixture();
+    var scanner = new FakeHeadScanner(List.of(new Head(fixture.aid(), "GroupChat", 2)));
+    var applier = new Applier(sqlSessionFactory, new RmuTestSupport.InMemoryJournalReader(), 1);
+    var resyncer = new Resyncer(applier, scanner, null);
+
+    assertThrows(ReadModelUpdateException.class, resyncer::resync);
   }
 
   private static final class FakeHeadScanner implements HeadScanner {

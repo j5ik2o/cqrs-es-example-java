@@ -154,7 +154,9 @@ public final class DynamoDBHeadStreamClient implements HeadStreamClient {
     } else if (value.hasSs() && value.ss() != null) {
       return new AttributeValue(value.ss());
     } else if (value.hasNs() && value.ns() != null) {
-      return new AttributeValue(value.ns());
+      var attribute = new AttributeValue();
+      attribute.setNS(value.ns());
+      return attribute;
     } else if (value.hasL() && value.l() != null) {
       var attribute = new AttributeValue();
       attribute.setL(value.l().stream().map(this::convertAttributeValue).toList());

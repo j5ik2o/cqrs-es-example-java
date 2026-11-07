@@ -14,10 +14,10 @@ import org.apache.ibatis.mapping.Environment;
 import org.apache.ibatis.session.Configuration;
 import org.apache.ibatis.session.SqlSessionFactory;
 import org.apache.ibatis.session.SqlSessionFactoryBuilder;
-import org.apache.ibatis.transaction.jdbc.JdbcTransactionFactory;
 import org.flywaydb.core.Flyway;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
+import org.mybatis.spring.transaction.SpringManagedTransactionFactory;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.testcontainers.containers.MySQLContainer;
 import org.testcontainers.utility.DockerImageName;
@@ -56,7 +56,7 @@ abstract class AbstractRmuDatabaseTest {
             MYSQL.getJdbcUrl(),
             MYSQL.getUsername(),
             MYSQL.getPassword());
-    var environment = new Environment("test", new JdbcTransactionFactory(), dataSource);
+    var environment = new Environment("test", new SpringManagedTransactionFactory(), dataSource);
     var configuration = new Configuration(environment);
     configuration.addMapper(GroupChatWriteMapper.class);
     configuration.addMapper(MemberWriteMapper.class);

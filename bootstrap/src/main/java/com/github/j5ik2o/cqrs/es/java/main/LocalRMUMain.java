@@ -58,8 +58,11 @@ public class LocalRMUMain implements CommandLineRunner {
 
     // The first start has no positions at all, and a restart may follow a stop longer than the
     // stream retention window. Reconcile every head before consuming the stream; the stream then
-    // covers the gap between the scan and the first read.
-    resync("initial reconciliation");
+    // covers the gap between the scan and the first read. Do not start polling until the baseline
+    // scan completes, otherwise an aggregate that was not scanned has no recovery task.
+    while (!resync("initial reconciliation")) {
+      sleep(pollBackoff.next());
+    }
     recoverPending();
     var nextRecoveryAt = Instant.now().plus(RECOVERY_INTERVAL);
 
@@ -70,7 +73,10 @@ public class LocalRMUMain implements CommandLineRunner {
             && lastRecordTime.isBefore(Instant.now().minus(STREAM_RETENTION))) {
           LOGGER.warn(
               "The reader was stopped longer than the stream retention window; running a full resync");
-          resync("resync after the retention window");
+          if (!resync("resync after the retention window")) {
+            sleep(pollBackoff.next());
+            continue;
+          }
           poller.reset();
           pollBackoff.reset();
         }
@@ -89,7 +95,10 @@ public class LocalRMUMain implements CommandLineRunner {
             "The reader fell behind the stream retention window; running a full resync: shardId={}",
             e.shardId(),
             e);
-        resync("resync after trimmed stream");
+        if (!resync("resync after trimmed stream")) {
+          sleep(pollBackoff.next());
+          continue;
+        }
         poller.reset();
         pollBackoff.reset();
       } catch (RetryInterruptedException e) {
@@ -104,7 +113,7 @@ public class LocalRMUMain implements CommandLineRunner {
     }
   }
 
-  private void resync(String label) {
+  private boolean resync(String label) {
     try {
       retryPolicy.run(
           () -> {
@@ -117,12 +126,15 @@ public class LocalRMUMain implements CommandLineRunner {
                 result.advanced(),
                 result.failed());
           });
+      return true;
     } catch (RetryInterruptedException e) {
       throw e;
     } catch (RuntimeException e) {
       // Permanent per-aggregate failures were already recorded as recovery tasks and logged
-      // inside the resyncer. A storage failure is retried on the next loop.
+      // inside the resyncer. A storage failure leaves the resync incomplete; the caller keeps
+      // retrying it before polling again.
       LOGGER.error("{} did not complete", label, e);
+      return false;
     }
   }
 

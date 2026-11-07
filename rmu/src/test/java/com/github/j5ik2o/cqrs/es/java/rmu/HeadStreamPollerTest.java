@@ -57,6 +57,24 @@ class HeadStreamPollerTest {
     assertEquals(List.of("event-1"), handled);
   }
 
+  @Test
+  void limitsThePagesReadFromOneShard() {
+    var client = new FakeHeadStreamClient();
+    for (var index = 1; index <= 11; index++) {
+      client.responses.add(
+          page(record("event-" + index), Integer.toString(index), "iterator-" + index));
+    }
+    client.responses.add(page(null, null, "iterator-11"));
+    var handled = new ArrayList<String>();
+    var poller = new HeadStreamPoller(client, record -> handled.add(record.getEventID()), 10);
+
+    assertEquals(10, poller.pollOnce("head"));
+    assertEquals(10, handled.size());
+
+    assertEquals(1, poller.pollOnce("head"));
+    assertEquals(11, handled.size());
+  }
+
   private static DynamodbEvent.DynamodbStreamRecord record(String eventId) {
     var record = new DynamodbEvent.DynamodbStreamRecord();
     record.setEventID(eventId);

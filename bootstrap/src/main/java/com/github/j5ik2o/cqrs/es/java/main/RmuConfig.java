@@ -17,6 +17,7 @@ import com.github.j5ik2o.cqrs.es.java.rmu.RetryPolicy;
 import java.time.Clock;
 import java.time.Duration;
 import org.apache.ibatis.session.SqlSessionFactory;
+import org.mybatis.spring.boot.autoconfigure.ConfigurationCustomizer;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.Profile;
@@ -27,6 +28,17 @@ import software.amazon.awssdk.services.dynamodb.streams.DynamoDbStreamsClient;
 @Configuration
 @Profile("local-rmu")
 public class RmuConfig {
+
+  /**
+   * Bounds a single SQL statement by the retry budget. A MySQL row lock wait otherwise lasts up to
+   * 50 seconds, which can exceed the RMU's maximum elapsed time before the next attempt is checked.
+   */
+  @Bean
+  public ConfigurationCustomizer rmuStatementTimeout(AppConfig appConfig) {
+    return configuration ->
+        configuration.setDefaultStatementTimeout(
+            (int) Math.max(1, appConfig.getStream().getRetryMaxElapsedMillis() / 1000));
+  }
 
   @Bean
   public RetryPolicy rmuRetryPolicy(AppConfig appConfig) {

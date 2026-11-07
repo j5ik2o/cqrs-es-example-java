@@ -12,4 +12,7 @@ public interface RecoveryTaskStore {
   List<RecoveryTask> listPending();
 
   void markCompleted(String storeId, String projectionName, String aggregateId, long seqNr);
+
+  /** Records a failed recovery attempt and moves the task behind tasks not yet attempted. */
+  void markFailed(RecoveryTask task, Throwable failure);
 }

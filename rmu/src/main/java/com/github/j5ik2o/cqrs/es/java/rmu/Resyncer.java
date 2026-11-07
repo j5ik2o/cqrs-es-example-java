@@ -28,7 +28,7 @@ public final class Resyncer {
     var skipped = new int[1];
     var advanced = new int[1];
     var failed = new int[1];
-    RuntimeException[] recordedFailure = new RuntimeException[1];
+    RuntimeException[] firstFailure = new RuntimeException[1];
 
     scanner.scanHeads(
         head -> {
@@ -54,26 +54,36 @@ public final class Resyncer {
                 recovery.record(head.aggregateId(), head.seqNr(), e);
               } catch (RuntimeException recordError) {
                 recordError.addSuppressed(e);
-                if (recordedFailure[0] == null) {
-                  recordedFailure[0] = recordError;
-                } else {
-                  recordedFailure[0].addSuppressed(recordError);
-                }
+                addFailure(firstFailure, recordError);
                 return;
               }
+            } else {
+              // Without a recovery service the failure is not durable. Keep the original error
+              // and report it after the remaining aggregates have been scanned.
+              addFailure(firstFailure, e);
             }
             LOGGER.error(
-                "Resync could not apply an aggregate; recorded a recovery task: aid={}, seqNr={}",
+                recovery != null
+                    ? "Resync could not apply an aggregate; recorded a recovery task: aid={}, seqNr={}"
+                    : "Resync could not apply an aggregate and no recovery service is configured: aid={}, seqNr={}",
                 head.aggregateId(),
                 head.seqNr(),
                 e);
           }
         });
 
-    if (recordedFailure[0] != null) {
-      throw recordedFailure[0];
+    if (firstFailure[0] != null) {
+      throw firstFailure[0];
     }
     return new ResyncResult(heads[0], skipped[0], advanced[0], failed[0]);
+  }
+
+  private static void addFailure(RuntimeException[] firstFailure, RuntimeException failure) {
+    if (firstFailure[0] == null) {
+      firstFailure[0] = failure;
+    } else {
+      firstFailure[0].addSuppressed(failure);
+    }
   }
 
   private static boolean isRecoverable(Throwable failure) {
