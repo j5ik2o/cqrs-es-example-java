@@ -952,10 +952,10 @@
         }
       }
     },
-    "OnFailureDlqAlarm": {
+    "RecoveryDlqAlarm": {
       "Type": "AWS::CloudWatch::Alarm",
       "Properties": {
-        "AlarmDescription": "The OnFailure dead-letter queue has messages. Exhausted stream records need a manual replay or a full resync.",
+        "AlarmDescription": "The recovery dead-letter queue has messages. A recovery task exhausted its retries and needs a manual replay.",
         "Namespace": "AWS/SQS",
         "MetricName": "ApproximateNumberOfMessagesVisible",
         "Dimensions": [
@@ -963,7 +963,7 @@
             "Name": "QueueName",
             "Value": {
               "Fn::GetAtt": [
-                "OnFailureDlq",
+                "RecoveryDlq",
                 "QueueName"
               ]
             }

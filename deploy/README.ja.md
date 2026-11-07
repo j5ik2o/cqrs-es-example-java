@@ -256,7 +256,7 @@ aws lambda invoke \
 | `RecoveryBacklogAlarm` | `AWS/SQS` の `RecoveryQueue` の `ApproximateNumberOfMessagesVisible` | 復旧キューの滞留。5 分間隔で 2 回、しきい値（既定 10）以上になったら通知する。 |
 | `RecoveryWorkerErrorsAlarm` | `AWS/Lambda` の `RecoveryWorkerFunction` の `Errors` | 復旧ワーカーがエラーを返した。 |
 | `OnFailureQueueAlarm` | `AWS/SQS` の `OnFailureQueue` の可視メッセージ数 | ストリームレコードが再試行上限に達した。 |
-| `OnFailureDlqAlarm` | `AWS/SQS` の `OnFailureDlq` の可視メッセージ数 | OnFailure キューでも処理できなかったメッセージがある。 |
+| `RecoveryDlqAlarm` | `AWS/SQS` の `RecoveryDlq` の可視メッセージ数 | 復旧ワーカーが再試行を使い切っても処理できなかった復旧タスクがある。 |
 | `ResyncWorkerErrorsAlarm` | `AWS/Lambda` の `ResyncWorkerFunction` の `Errors` | 全件再同期が失敗した。 |
 | `ResyncScheduleFailedInvocationsAlarm` | `AWS/Events` の `ResyncWorkerSchedule` の `FailedInvocations` | 定期実行が再同期ワーカーを起動できなかった。 |
 

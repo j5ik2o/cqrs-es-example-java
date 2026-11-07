@@ -227,10 +227,18 @@ class RmuDeploymentTemplateTest {
         template
             .at("/Resources/OnFailureQueueAlarm/Properties/Dimensions/0/Value/Fn::GetAtt/0")
             .asText());
+  }
+
+  @Test
+  void alarmsOnTheRecoveryDeadLetterQueue() {
+    var template = template();
+
     assertEquals(
-        "OnFailureDlq",
+        "AWS/SQS", template.at("/Resources/RecoveryDlqAlarm/Properties/Namespace").asText());
+    assertEquals(
+        "RecoveryDlq",
         template
-            .at("/Resources/OnFailureDlqAlarm/Properties/Dimensions/0/Value/Fn::GetAtt/0")
+            .at("/Resources/RecoveryDlqAlarm/Properties/Dimensions/0/Value/Fn::GetAtt/0")
             .asText());
   }
 
