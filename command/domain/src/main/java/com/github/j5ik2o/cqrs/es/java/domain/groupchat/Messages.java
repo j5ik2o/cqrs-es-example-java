@@ -3,6 +3,7 @@ package com.github.j5ik2o.cqrs.es.java.domain.groupchat;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import io.vavr.Tuple2;
 import io.vavr.collection.Vector;
+import io.vavr.control.Either;
 import io.vavr.control.Option;
 import java.util.Objects;
 import javax.annotation.Nonnull;
@@ -23,6 +24,20 @@ public final class Messages {
     return values
         .find(message -> message.getId().equals(messageId))
         .map(message -> new Tuple2<>(message, new Messages(values.remove(message))));
+  }
+
+  public Either<IllegalArgumentException, Tuple2<Message, Messages>> editByMessageId(
+      MessageId messageId, String content) {
+    return values
+        .find(message -> message.getId().equals(messageId))
+        .toEither(() -> new IllegalArgumentException("message not found: " + messageId.asString()))
+        .flatMap(
+            message ->
+                Message.validate(
+                        message.getId(), content, message.getSenderId(), message.getCreatedAt())
+                    .map(
+                        edited ->
+                            new Tuple2<>(edited, new Messages(values.replace(message, edited)))));
   }
 
   public Option<Message> findByMessageId(MessageId messageId) {

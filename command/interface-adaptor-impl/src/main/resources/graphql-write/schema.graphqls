@@ -51,6 +51,13 @@ input PostMessageInput {
     executorId: String!
 }
 
+input EditMessageInput {
+    groupChatId: String!
+    messageId: String!
+    content: String!
+    executorId: String!
+}
+
 input DeleteMessageInput {
     groupChatId: String!
     messageId: String!
@@ -64,6 +71,7 @@ type Mutation {
     addMember(input: AddMemberInput!): GroupChatOutput!
     removeMember(input: RemoveMemberInput!): GroupChatOutput!
     postMessage(input: PostMessageInput!): MessageOutput!
+    editMessage(input: EditMessageInput!): GroupChatOutput!
     deleteMessage(input: DeleteMessageInput!): GroupChatOutput!
 }
 

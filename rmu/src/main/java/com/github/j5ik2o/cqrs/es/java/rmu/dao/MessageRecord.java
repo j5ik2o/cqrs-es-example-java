@@ -5,7 +5,7 @@ import java.time.Instant;
 public record MessageRecord(
     String id,
     String groupChatId,
-    String content,
-    String senderId,
+    String userAccountId,
+    String text,
     Instant createdAt,
     Instant updatedAt) {}

@@ -19,22 +19,14 @@ public class DynamoDBAsyncUtils {
         .build();
   }
 
-  public static CompletableFuture<Void> createSnapshotTable(
-      DynamoDbAsyncClient client, String tableName, String indexName) {
+  public static CompletableFuture<Void> createJournalTable(
+      DynamoDbAsyncClient client, String tableName) {
     var pt = ProvisionedThroughput.builder().readCapacityUnits(10L).writeCapacityUnits(5L).build();
-    var response =
-        client.createTable(
+    return client
+        .createTable(
             CreateTableRequest.builder()
                 .tableName(tableName)
                 .attributeDefinitions(
-                    AttributeDefinition.builder()
-                        .attributeName("pkey")
-                        .attributeType(ScalarAttributeType.S)
-                        .build(),
-                    AttributeDefinition.builder()
-                        .attributeName("skey")
-                        .attributeType(ScalarAttributeType.S)
-                        .build(),
                     AttributeDefinition.builder()
                         .attributeName("aid")
                         .attributeType(ScalarAttributeType.S)
@@ -44,42 +36,22 @@ public class DynamoDBAsyncUtils {
                         .attributeType(ScalarAttributeType.N)
                         .build())
                 .keySchema(
-                    KeySchemaElement.builder().attributeName("pkey").keyType(KeyType.HASH).build(),
-                    KeySchemaElement.builder().attributeName("skey").keyType(KeyType.RANGE).build())
-                .globalSecondaryIndexes(
-                    GlobalSecondaryIndex.builder()
-                        .indexName(indexName)
-                        .keySchema(
-                            KeySchemaElement.builder()
-                                .attributeName("aid")
-                                .keyType(KeyType.HASH)
-                                .build(),
-                            KeySchemaElement.builder()
-                                .attributeName("seq_nr")
-                                .keyType(KeyType.RANGE)
-                                .build())
-                        .projection(Projection.builder().projectionType(ProjectionType.ALL).build())
-                        .provisionedThroughput(pt)
+                    KeySchemaElement.builder().attributeName("aid").keyType(KeyType.HASH).build(),
+                    KeySchemaElement.builder()
+                        .attributeName("seq_nr")
+                        .keyType(KeyType.RANGE)
+                        .build())
+                .streamSpecification(
+                    StreamSpecification.builder()
+                        .streamEnabled(true)
+                        .streamViewType(StreamViewType.NEW_IMAGE)
                         .build())
                 .provisionedThroughput(pt)
-                .build());
-    return response
-        .thenCompose(
-            r -> {
-              return client.updateTimeToLive(
-                  UpdateTimeToLiveRequest.builder()
-                      .tableName(tableName)
-                      .timeToLiveSpecification(
-                          TimeToLiveSpecification.builder()
-                              .enabled(true)
-                              .attributeName("ttl")
-                              .build())
-                      .build());
-            })
+                .build())
         .thenRun(() -> {});
   }
 
-  public static CompletableFuture<Void> createJournalTable(
+  public static CompletableFuture<Void> createSnapshotTable(
       DynamoDbAsyncClient client, String tableName, String indexName) {
     var pt = ProvisionedThroughput.builder().readCapacityUnits(10L).writeCapacityUnits(5L).build();
     return client
@@ -88,23 +60,19 @@ public class DynamoDBAsyncUtils {
                 .tableName(tableName)
                 .attributeDefinitions(
                     AttributeDefinition.builder()
-                        .attributeName("pkey")
-                        .attributeType(ScalarAttributeType.S)
-                        .build(),
-                    AttributeDefinition.builder()
-                        .attributeName("skey")
-                        .attributeType(ScalarAttributeType.S)
-                        .build(),
-                    AttributeDefinition.builder()
                         .attributeName("aid")
                         .attributeType(ScalarAttributeType.S)
                         .build(),
                     AttributeDefinition.builder()
-                        .attributeName("seq_nr")
+                        .attributeName("skey")
+                        .attributeType(ScalarAttributeType.N)
+                        .build(),
+                    AttributeDefinition.builder()
+                        .attributeName("active_history_seq_nr")
                         .attributeType(ScalarAttributeType.N)
                         .build())
                 .keySchema(
-                    KeySchemaElement.builder().attributeName("pkey").keyType(KeyType.HASH).build(),
+                    KeySchemaElement.builder().attributeName("aid").keyType(KeyType.HASH).build(),
                     KeySchemaElement.builder().attributeName("skey").keyType(KeyType.RANGE).build())
                 .globalSecondaryIndexes(
                     GlobalSecondaryIndex.builder()
@@ -115,11 +83,36 @@ public class DynamoDBAsyncUtils {
                                 .keyType(KeyType.HASH)
                                 .build(),
                             KeySchemaElement.builder()
-                                .attributeName("seq_nr")
+                                .attributeName("active_history_seq_nr")
                                 .keyType(KeyType.RANGE)
                                 .build())
-                        .projection(Projection.builder().projectionType(ProjectionType.ALL).build())
+                        .projection(
+                            Projection.builder().projectionType(ProjectionType.KEYS_ONLY).build())
                         .provisionedThroughput(pt)
+                        .build())
+                .provisionedThroughput(pt)
+                .build())
+        .thenRun(() -> {});
+  }
+
+  public static CompletableFuture<Void> createHeadTable(
+      DynamoDbAsyncClient client, String tableName) {
+    var pt = ProvisionedThroughput.builder().readCapacityUnits(10L).writeCapacityUnits(5L).build();
+    return client
+        .createTable(
+            CreateTableRequest.builder()
+                .tableName(tableName)
+                .attributeDefinitions(
+                    AttributeDefinition.builder()
+                        .attributeName("aid")
+                        .attributeType(ScalarAttributeType.S)
+                        .build())
+                .keySchema(
+                    KeySchemaElement.builder().attributeName("aid").keyType(KeyType.HASH).build())
+                .streamSpecification(
+                    StreamSpecification.builder()
+                        .streamEnabled(true)
+                        .streamViewType(StreamViewType.NEW_IMAGE)
                         .build())
                 .provisionedThroughput(pt)
                 .build())

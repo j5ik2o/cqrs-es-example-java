@@ -21,11 +21,18 @@ app:
     secret-access-key: x
   persistence:
     journal-table-name: journal
-    journal-aid-index-name: journal-aid-index
     snapshot-table-name: snapshot
+    head-table-name: head
     snapshot-aid-index-name: snapshot-aid-index
-    shard-count: 64
     snapshot-interval: 10
   stream:
+    head-table-name: head
     journal-table-name: journal
     max-item-count: 32
+    max-events-per-transaction: 1
+    retry-max-attempts: 5
+    retry-max-elapsed-millis: 30000
+    retry-initial-delay-millis: 200
+    retry-max-delay-millis: 5000
+    poll-backoff-initial-millis: 500
+    poll-backoff-max-millis: 30000
