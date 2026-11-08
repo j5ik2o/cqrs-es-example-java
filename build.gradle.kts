@@ -84,7 +84,7 @@ subprojects {
         implementation("io.vavr:vavr:1.1.0")
 
         testImplementation("org.springframework.boot:spring-boot-testcontainers")
-        testImplementation("org.testcontainers:junit-jupiter")
+        testImplementation("org.testcontainers:junit-jupiter:1.21.4")
 
         testImplementation("org.springframework.boot:spring-boot-starter-test")
         testImplementation("org.springframework.graphql:spring-graphql-test")
