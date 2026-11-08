@@ -38,7 +38,9 @@ Built with JDK 17 (Temurin 17.0.21) and Gradle 8.14.6 on macOS aarch64.
 | `lib/` (190 JARs) | 135,029,726 | 128.77 |
 | Files in the ZIP | 250 | |
 
-The ZIP barely compresses because its payload is already-compressed JARs.
+The ZIP barely compresses because its payload is already-compressed JARs. The
+compressed size moves by a few bytes between builds because ZIP entries carry
+timestamps; the uncompressed size is stable.
 
 ### Largest JARs in `lib/`
 
