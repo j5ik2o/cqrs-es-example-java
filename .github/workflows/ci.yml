@@ -24,7 +24,6 @@ jobs:
           java-version: 17
       - uses: gradle/gradle-build-action@v3
         with:
-          gradle-version: 8.3
           arguments: spotlessCheck --info
   test:
     runs-on: ubuntu-latest
@@ -44,7 +43,6 @@ jobs:
           java-version: ${{ matrix.java }}
       - uses: gradle/gradle-build-action@v3
         with:
-          gradle-version: 8.3
           arguments: test --info
   e2e:
     runs-on: ubuntu-latest
