@@ -21,7 +21,7 @@ jobs:
       - uses: actions/setup-java@v6
         with:
           distribution: temurin
-          java-version: 25
+          java-version: 17
       - uses: gradle/gradle-build-action@v3
         with:
           arguments: spotlessCheck --info
@@ -62,7 +62,7 @@ jobs:
       JVM_OPTS:  -Xms2048M -Xmx2048M -Xss6M -XX:ReservedCodeCacheSize=256M -Dfile.encoding=UTF-8
     strategy:
       matrix:
-        java: [ 17 ] # LTS versions + latest version
+        java: [ 17, 25 ] # LTS versions + latest version
     name: "Run tests with JDK ${{ matrix.java }}"
     steps:
       - uses: actions/checkout@v7
