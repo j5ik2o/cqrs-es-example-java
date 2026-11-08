@@ -5,7 +5,7 @@ import org.springframework.boot.gradle.tasks.bundling.BootJar
 
 plugins {
     java
-    id("org.springframework.boot") version "3.5.16"
+    id("org.springframework.boot") version "4.1.2"
     id("io.spring.dependency-management") version "1.1.7"
     id("com.diffplug.spotless") version "8.11.0"
     id("io.github.kobylynskyi.graphql.codegen") version "5.10.0"
@@ -84,9 +84,10 @@ subprojects {
         implementation("io.vavr:vavr:1.1.0")
 
         testImplementation("org.springframework.boot:spring-boot-testcontainers")
-        testImplementation("org.testcontainers:junit-jupiter")
+        testImplementation("org.testcontainers:junit-jupiter:1.21.4")
 
         testImplementation("org.springframework.boot:spring-boot-starter-test")
+        testImplementation("org.springframework:spring-web")
         testImplementation("org.springframework.graphql:spring-graphql-test")
 
         compileOnly("org.projectlombok:lombok")
@@ -236,8 +237,8 @@ project(":query:interface-adaptor") {
         implementation("javax.validation:validation-api:2.0.1.Final")
         implementation("org.springframework:spring-context")
         implementation("org.springframework.boot:spring-boot-starter-graphql")
-        implementation("org.mybatis.spring.boot:mybatis-spring-boot-starter:3.0.5")
-        testImplementation("org.mybatis.spring.boot:mybatis-spring-boot-starter-test:3.0.5")
+        implementation("org.mybatis.spring.boot:mybatis-spring-boot-starter:4.1.0")
+        testImplementation("org.mybatis.spring.boot:mybatis-spring-boot-starter-test:4.1.0")
         testImplementation("org.flywaydb:flyway-core:13.12.1")
         testImplementation("org.flywaydb:flyway-mysql:13.12.1")
         testImplementation("org.testcontainers:mysql:1.21.4")
@@ -284,8 +285,8 @@ project(":rmu") {
         implementation(project(":command:interface-adaptor-impl"))
         implementation(project(":command:domain"))
 
-        implementation("org.mybatis.spring.boot:mybatis-spring-boot-starter:3.0.5")
-        testImplementation("org.mybatis.spring.boot:mybatis-spring-boot-starter-test:3.0.5")
+        implementation("org.mybatis.spring.boot:mybatis-spring-boot-starter:4.1.0")
+        testImplementation("org.mybatis.spring.boot:mybatis-spring-boot-starter-test:4.1.0")
 
         testImplementation("org.flywaydb:flyway-core:13.12.1")
         testImplementation("org.flywaydb:flyway-mysql:13.12.1")
@@ -339,7 +340,7 @@ project(":bootstrap") {
         implementation("software.amazon.awssdk:dynamodb:2.57.11")
         implementation("com.amazonaws:aws-lambda-java-events:3.16.1")
         implementation("org.springframework.boot:spring-boot-configuration-processor")
-        implementation("org.mybatis.spring.boot:mybatis-spring-boot-starter:3.0.5")
+        implementation("org.mybatis.spring.boot:mybatis-spring-boot-starter:4.1.0")
     }
     jib {
         to {
