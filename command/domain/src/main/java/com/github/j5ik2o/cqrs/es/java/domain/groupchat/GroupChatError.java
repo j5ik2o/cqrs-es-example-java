@@ -52,4 +52,19 @@ public abstract class GroupChatError extends RuntimeException {
       super(String.format("Message(id = %s) is not found in GroupChat(id = %s).", messageId, id));
     }
   }
+
+  public static final class NotSenderError extends GroupChatError {
+    public NotSenderError(GroupChatId id, UserAccountId executorId) {
+      super(
+          String.format(
+              "UserAccount(id = %s) is not the sender of the message in GroupChat(id = %s).",
+              executorId, id));
+    }
+  }
+
+  public static final class InvalidMessageError extends GroupChatError {
+    public InvalidMessageError(GroupChatId id, String reason) {
+      super(String.format("Message in GroupChat(id = %s) is invalid: %s", id, reason));
+    }
+  }
 }

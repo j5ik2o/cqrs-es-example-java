@@ -42,8 +42,16 @@ public class AppConfig {
   @Setter
   @ToString
   public static class Stream {
+    private String headTableName;
     private String journalTableName;
     private int maxItemCount;
+    private int maxEventsPerTransaction = 1;
+    private int retryMaxAttempts = 5;
+    private long retryMaxElapsedMillis = 30_000L;
+    private long retryInitialDelayMillis = 200L;
+    private long retryMaxDelayMillis = 5_000L;
+    private long pollBackoffInitialMillis = 500L;
+    private long pollBackoffMaxMillis = 30_000L;
   }
 
   @Getter
@@ -52,9 +60,8 @@ public class AppConfig {
   public static class Persistence {
     private String journalTableName;
     private String snapshotTableName;
-    private String journalAidIndexName;
+    private String headTableName;
     private String snapshotAidIndexName;
-    private int shardCount;
     private long snapshotInterval;
   }
 }

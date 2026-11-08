@@ -79,12 +79,7 @@ public final class Message {
 
   public static Message of(
       MessageId id, String content, UserAccountId senderId, LocalDateTime createdAt) {
-    if (content == null || content.isEmpty()) {
-      throw new IllegalArgumentException("content is empty");
-    }
-    if (content.length() > 1000) {
-      throw new IllegalArgumentException("content is too long");
-    }
+    requireValidContent(content);
     return new Message(id, content, senderId, createdAt);
   }
 
@@ -94,6 +89,24 @@ public final class Message {
       return Either.right(of(id, content, senderId, createdAt));
     } catch (IllegalArgumentException e) {
       return Either.left(e);
+    }
+  }
+
+  public static Either<IllegalArgumentException, String> validateContent(String content) {
+    try {
+      requireValidContent(content);
+      return Either.right(content);
+    } catch (IllegalArgumentException e) {
+      return Either.left(e);
+    }
+  }
+
+  private static void requireValidContent(String content) {
+    if (content == null || content.isEmpty()) {
+      throw new IllegalArgumentException("content is empty");
+    }
+    if (content.length() > 1000) {
+      throw new IllegalArgumentException("content is too long");
     }
   }
 }

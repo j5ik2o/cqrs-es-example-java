@@ -24,8 +24,36 @@ jobs:
           java-version: 17
       - uses: gradle/gradle-build-action@v3
         with:
-          gradle-version: 8.3
           arguments: spotlessCheck --info
+  deploy-assets:
+    runs-on: ubuntu-latest
+    needs: lint
+    name: "Validate deployment assets"
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.13'
+      - run: pip install cfn-lint
+      - run: cfn-lint deploy/rmu-deployment.template.json
+      - run: |
+          bash -n deploy/apply-rmu-deployment.sh
+          bash -n deploy/build-lambda-package.sh
+          bash -n deploy/report-lambda-package-size.sh
+      - uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          java-version: 17
+      - uses: gradle/gradle-build-action@v3
+        with:
+          arguments: :rmu:lambdaZip --console=plain
+      - run: |
+          unzip -l rmu/build/distributions/rmu-lambda.zip | grep -F 'com/github/j5ik2o/cqrs/es/java/rmu/ReadModelUpdater.class'
+          unzip -l rmu/build/distributions/rmu-lambda.zip | grep -F 'com/github/j5ik2o/cqrs/es/java/rmu/RecoveryWorker.class'
+          unzip -l rmu/build/distributions/rmu-lambda.zip | grep -F 'com/github/j5ik2o/cqrs/es/java/rmu/ResyncWorker.class'
+          unzip -l rmu/build/distributions/rmu-lambda.zip | grep -F 'lib/aws-lambda-java-events'
+      - name: Report Lambda package size
+        run: deploy/report-lambda-package-size.sh rmu/build/distributions/rmu-lambda.zip
   test:
     runs-on: ubuntu-latest
     needs: lint
@@ -44,7 +72,6 @@ jobs:
           java-version: ${{ matrix.java }}
       - uses: gradle/gradle-build-action@v3
         with:
-          gradle-version: 8.3
           arguments: test --info
   e2e:
     runs-on: ubuntu-latest

@@ -1,5 +1,6 @@
 import com.google.cloud.tools.jib.api.buildplan.ImageFormat
 import io.github.kobylynskyi.graphql.codegen.gradle.GraphQLCodegenGradleTask
+import org.gradle.api.tasks.bundling.Zip
 import org.springframework.boot.gradle.tasks.bundling.BootJar
 
 plugins {
@@ -78,8 +79,8 @@ subprojects {
     dependencies {
         implementation("com.google.code.findbugs:jsr305:3.0.2")
         implementation("org.projectlombok:lombok:1.18.48")
-        testImplementation("org.junit.jupiter:junit-jupiter-api:6.1.3")
-        testRuntimeOnly("org.junit.jupiter:junit-jupiter-engine:6.1.3")
+        testImplementation("org.junit.jupiter:junit-jupiter-api")
+        testRuntimeOnly("org.junit.jupiter:junit-jupiter-engine")
         implementation("io.vavr:vavr:1.1.0")
 
         testImplementation("org.springframework.boot:spring-boot-testcontainers")
@@ -128,8 +129,12 @@ project(":infrastructure") {
 }
 
 project(":command:domain") {
+    tasks.test {
+        enabled = true
+    }
+
     dependencies {
-        implementation("com.github.j5ik2o:event-store-adapter-java:1.1.174")
+        implementation("io.github.j5ik2o:event-store-adapter-java:5.1.0")
         implementation(project(":infrastructure"))
         implementation("com.github.f4b6a3:ulid-creator:5.2.4")
         implementation("com.fasterxml.jackson.core:jackson-databind:2.22.4")
@@ -149,19 +154,23 @@ project(":command:interface-adaptor-if") {
 
 project(":command:interface-adaptor-impl") {
     apply(plugin = "io.github.kobylynskyi.graphql.codegen")
+
+    tasks.test {
+        enabled = true
+    }
+
     dependencies {
         implementation(project(":infrastructure"))
         implementation(project(":command:domain"))
         implementation(project(":command:interface-adaptor-if"))
         implementation(project(":command:processor"))
-        implementation("com.github.j5ik2o:event-store-adapter-java:1.1.174")
+        implementation("io.github.j5ik2o:event-store-adapter-java:5.1.0")
         implementation("com.github.f4b6a3:ulid-creator:5.2.4")
 
         implementation("org.springframework.boot:spring-boot-starter")
         testImplementation("org.springframework.boot:spring-boot-starter-test")
 
         implementation("org.springframework.boot:spring-boot-starter-graphql")
-        implementation("com.graphql-java:graphql-java:230521-nf-execution")
 
         testImplementation("org.springframework:spring-webflux")
         implementation("mysql:mysql-connector-java:8.0.33")
@@ -169,7 +178,7 @@ project(":command:interface-adaptor-impl") {
         testImplementation("org.testcontainers:localstack:1.21.4")
         testImplementation("org.testcontainers:mysql:1.21.4")
 
-        implementation("software.amazon.awssdk:dynamodb:2.57.10")
+        implementation("software.amazon.awssdk:dynamodb:2.57.11")
         implementation("javax.validation:validation-api:2.0.1.Final")
 
         implementation("io.projectreactor:reactor-core:3.8.8")
@@ -211,25 +220,28 @@ project(":command:processor") {
         implementation(project(":command:domain"))
         implementation(project(":command:interface-adaptor-if"))
         implementation("org.springframework:spring-context")
-        implementation("com.github.j5ik2o:event-store-adapter-java:1.1.174")
+        implementation("io.github.j5ik2o:event-store-adapter-java:5.1.0")
         implementation("com.fasterxml.jackson.core:jackson-annotations:2.22")
     }
 }
 
 project(":query:interface-adaptor") {
     apply(plugin = "io.github.kobylynskyi.graphql.codegen")
+    tasks.test {
+        enabled = true
+    }
     dependencies {
         implementation(project(":infrastructure"))
         implementation("io.projectreactor:reactor-core:3.8.8")
         implementation("javax.validation:validation-api:2.0.1.Final")
         implementation("org.springframework:spring-context")
         implementation("org.springframework.boot:spring-boot-starter-graphql")
-        implementation("com.graphql-java:graphql-java:230521-nf-execution")
-        implementation("org.mybatis.spring.boot:mybatis-spring-boot-starter:4.1.0")
-        testImplementation("org.mybatis.spring.boot:mybatis-spring-boot-starter-test:4.1.0")
+        implementation("org.mybatis.spring.boot:mybatis-spring-boot-starter:3.0.5")
+        testImplementation("org.mybatis.spring.boot:mybatis-spring-boot-starter-test:3.0.5")
         testImplementation("org.flywaydb:flyway-core:13.12.1")
         testImplementation("org.flywaydb:flyway-mysql:13.12.1")
-        implementation("com.tailrocks.graphql:graphql-datetime-spring-boot-starter:6.0.0")
+        testImplementation("org.testcontainers:mysql:1.21.4")
+        testImplementation("mysql:mysql-connector-java:8.0.33")
     }
 
     tasks.named<GraphQLCodegenGradleTask>("graphqlCodegen") {
@@ -238,7 +250,7 @@ project(":query:interface-adaptor") {
         graphqlSchemaPaths = listOf("$projectDir/src/main/resources/graphql-read/schema.graphqls")
         outputDir = File("$projectDir/build/generated")
         packageName = "com.github.j5ik2o.cqrs.es.java.query.interface_adaptor.graphql"
-        customTypesMapping = mutableMapOf(Pair("LocalDateTime", "java.time.LocalDateTime"))
+        customTypesMapping = mutableMapOf(Pair("NaiveDateTime", "java.time.LocalDateTime"))
         customAnnotationsMapping =
             mutableMapOf(
                 Pair(
@@ -263,24 +275,47 @@ project(":query:interface-adaptor") {
 }
 
 project(":rmu") {
+    tasks.test {
+        enabled = true
+    }
+
     dependencies {
         implementation(project(":infrastructure"))
         implementation(project(":command:interface-adaptor-impl"))
         implementation(project(":command:domain"))
 
-        implementation("org.mybatis.spring.boot:mybatis-spring-boot-starter:4.1.0")
-        testImplementation("org.mybatis.spring.boot:mybatis-spring-boot-starter-test:4.1.0")
+        implementation("org.mybatis.spring.boot:mybatis-spring-boot-starter:3.0.5")
+        testImplementation("org.mybatis.spring.boot:mybatis-spring-boot-starter-test:3.0.5")
 
         testImplementation("org.flywaydb:flyway-core:13.12.1")
         testImplementation("org.flywaydb:flyway-mysql:13.12.1")
+        testImplementation("org.testcontainers:localstack:1.21.4")
+        testImplementation("org.testcontainers:mysql:1.21.4")
+        testImplementation("mysql:mysql-connector-java:8.0.33")
 
         implementation("com.amazonaws:aws-lambda-java-events:3.16.1")
         implementation("com.amazonaws:aws-lambda-java-core:1.4.1")
-        implementation("com.github.j5ik2o:event-store-adapter-java:1.1.174")
+        implementation("io.github.j5ik2o:event-store-adapter-java:5.1.0")
+        implementation("software.amazon.awssdk:dynamodb:2.57.11")
+        implementation("software.amazon.awssdk:secretsmanager:2.57.11")
+        implementation("software.amazon.awssdk:sqs:2.57.11")
 
         implementation("com.fasterxml.jackson.core:jackson-databind:2.22.4")
         implementation("com.fasterxml.jackson.core:jackson-annotations:2.22")
         implementation("com.fasterxml.jackson.datatype:jackson-datatype-jsr310:2.22.4")
+    }
+
+    // AWS Lambda loads the handler classes from the ZIP root and the dependency JARs from lib/.
+    val runtimeClasspath = configurations.getByName("runtimeClasspath")
+    tasks.register<Zip>("lambdaZip") {
+        group = "build"
+        description =
+            "Builds the Lambda deployment package with the RMU, recovery worker, and resync worker handlers."
+        dependsOn(tasks.named("classes"))
+        archiveFileName.set("rmu-lambda.zip")
+        destinationDirectory.set(layout.buildDirectory.dir("distributions"))
+        from(sourceSets.getByName("main").output)
+        from(runtimeClasspath.filter { it.name.endsWith(".jar") }) { into("lib") }
     }
 }
 
@@ -300,11 +335,11 @@ project(":bootstrap") {
         implementation(project(":command:processor"))
         implementation(project(":query:interface-adaptor"))
         implementation(project(":rmu"))
-        implementation("com.github.j5ik2o:event-store-adapter-java:1.1.174")
-        implementation("software.amazon.awssdk:dynamodb:2.57.10")
+        implementation("io.github.j5ik2o:event-store-adapter-java:5.1.0")
+        implementation("software.amazon.awssdk:dynamodb:2.57.11")
         implementation("com.amazonaws:aws-lambda-java-events:3.16.1")
         implementation("org.springframework.boot:spring-boot-configuration-processor")
-        implementation("org.mybatis.spring.boot:mybatis-spring-boot-starter:4.1.0")
+        implementation("org.mybatis.spring.boot:mybatis-spring-boot-starter:3.0.5")
     }
     jib {
         to {
