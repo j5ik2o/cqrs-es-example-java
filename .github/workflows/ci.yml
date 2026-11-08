@@ -40,6 +40,7 @@ jobs:
       - run: |
           bash -n deploy/apply-rmu-deployment.sh
           bash -n deploy/build-lambda-package.sh
+          bash -n deploy/report-lambda-package-size.sh
       - uses: actions/setup-java@v6
         with:
           distribution: temurin
@@ -53,6 +54,8 @@ jobs:
           unzip -l rmu/build/distributions/rmu-lambda.zip | grep -F 'com/github/j5ik2o/cqrs/es/java/rmu/RecoveryWorker.class'
           unzip -l rmu/build/distributions/rmu-lambda.zip | grep -F 'com/github/j5ik2o/cqrs/es/java/rmu/ResyncWorker.class'
           unzip -l rmu/build/distributions/rmu-lambda.zip | grep -F 'lib/aws-lambda-java-events'
+      - name: Report Lambda package size
+        run: deploy/report-lambda-package-size.sh rmu/build/distributions/rmu-lambda.zip
   test:
     runs-on: ubuntu-latest
     needs: lint
