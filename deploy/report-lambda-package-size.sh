@@ -19,7 +19,7 @@ Prints the compressed and uncompressed size of the Lambda package, the number
 of files, the size of lib/, and the largest dependency JARs under lib/.
 
 Environment:
-  TOP   Number of JARs to list. Defaults to 20.
+  TOP   Non-negative number of JARs to list. Defaults to 20.
 USAGE
 }
 
@@ -32,6 +32,11 @@ esac
 
 if [[ ! -f "$ZIP" ]]; then
   echo "lambda package not found: $ZIP" >&2
+  exit 2
+fi
+
+if ! [[ "$TOP" =~ ^[0-9]+$ ]]; then
+  echo "TOP must be a non-negative integer: $TOP" >&2
   exit 2
 fi
 
@@ -61,7 +66,8 @@ jars = [
     if info.filename.startswith("lib/") and info.filename.endswith(".jar")
 ]
 uncompressed = sum(info.file_size for info in entries)
-lib_bytes = sum(info.file_size for info in jars)
+lib_entries = [info for info in entries if info.filename.startswith("lib/")]
+lib_bytes = sum(info.file_size for info in lib_entries)
 
 print(f"Lambda package: {path}")
 print(f"compressed:   {commas(os.path.getsize(path))} bytes ({mib(os.path.getsize(path)):.2f} MiB)")
@@ -74,16 +80,36 @@ for rank, info in enumerate(sorted(jars, key=lambda i: i.file_size, reverse=True
     name = info.filename[len("lib/"):]
     print(f"{rank:>3}. {commas(info.file_size):>12} B ({mib(info.file_size):>6.2f} MiB)  {name}")
 
+# Matched by artifact name. docs/LAMBDA_PACKAGE_SIZE.md confirms with
+# `dependencyInsight` that event-store-adapter-java pulls these in.
+BACKENDS = {
+    "sqlite": ("sqlite-jdbc-",),
+    "spanner": (
+        "google-cloud-spanner",
+        "proto-google-cloud-spanner",
+        "grpc-google-cloud-spanner",
+    ),
+    "bigtable": (
+        "google-cloud-bigtable",
+        "proto-google-cloud-bigtable",
+        "grpc-google-cloud-bigtable",
+    ),
+}
+
 print()
-print("Event store adapter backends present in lib/:")
-for marker in ("sqlite", "spanner", "bigtable"):
+print("Event store adapter backends in lib/ (filename match):")
+for backend, prefixes in BACKENDS.items():
     matches = sorted(
-        (info for info in jars if marker in info.filename.lower()),
+        (
+            info
+            for info in jars
+            if os.path.basename(info.filename).startswith(prefixes)
+        ),
         key=lambda i: i.file_size,
         reverse=True,
     )
     total = sum(info.file_size for info in matches)
-    print(f"  {marker:<9} {len(matches):>2} JAR(s), {commas(total)} bytes ({mib(total):.2f} MiB)")
+    print(f"  {backend:<9} {len(matches):>2} JAR(s), {commas(total)} bytes ({mib(total):.2f} MiB)")
     for info in matches:
         print(f"             {commas(info.file_size):>12} B  {info.filename[len('lib/'):]}")
 PY

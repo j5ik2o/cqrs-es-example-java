@@ -14,10 +14,11 @@ RMU の Lambda 配布物（`:rmu:lambdaZip`）は
 ```
 
 このスクリプトは、ZIP の圧縮サイズ、展開後のサイズ、ファイル数、`lib/` の
-サイズ、大きい順の JAR 20 件、および Spanner / Bigtable / SQLite バックエンド
-由来の JAR を出力する。`TOP` で一覧の件数を変えられる。合否のしきい値は持たない。
-CI では `deploy-assets` ジョブが pull request ごとに実行し、同じ内容をログに
-出す。
+サイズ、大きい順の JAR 20 件、およびファイル名が Spanner / Bigtable / SQLite
+バックエンドに一致する JAR を出力する。バックエンドの由来は次の節の
+`dependencyInsight` で確認している。`TOP` で一覧の件数を変えられる。合否の
+しきい値は持たない。CI では `deploy-assets` ジョブが pull request ごとに実行し、
+同じ内容をログに出す。
 
 依存の由来を確認するには次のコマンドを使う。
 

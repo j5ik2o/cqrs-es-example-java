@@ -14,8 +14,9 @@ split and no dependency exclusion is applied yet.
 ```
 
 The script prints the compressed ZIP size, the uncompressed size, the number of
-files, the size of `lib/`, the 20 largest JARs, and the JARs that come from the
-Spanner, Bigtable, and SQLite backends. `TOP` changes how many JARs are listed.
+files, the size of `lib/`, the 20 largest JARs, and the JARs whose filenames match
+the Spanner, Bigtable, and SQLite backends. The backend origin is confirmed with
+`dependencyInsight` in the next section. `TOP` changes how many JARs are listed.
 The script has no pass/fail threshold. CI runs it in the `deploy-assets` job on
 every pull request and logs the same output.
 
