@@ -4,6 +4,7 @@ import java.time.Instant;
 import org.apache.ibatis.annotations.Flush;
 import org.apache.ibatis.annotations.Insert;
 import org.apache.ibatis.annotations.Mapper;
+import org.apache.ibatis.annotations.Param;
 import org.apache.ibatis.annotations.Update;
 
 @Mapper
@@ -15,9 +16,10 @@ public interface GroupChatWriteMapper {
 
   @Update("UPDATE group_chats SET name = #{name}, updated_at = #{updatedAt} WHERE id = #{id}")
   @Flush
-  int updateGroupChatName(String id, String name, Instant updatedAt);
+  int updateGroupChatName(
+      @Param("id") String id, @Param("name") String name, @Param("updatedAt") Instant updatedAt);
 
-  @Update("UPDATE group_chats SET disabled = 1 WHERE id = #{id}")
+  @Update("UPDATE group_chats SET disabled = 1, updated_at = #{updatedAt} WHERE id = #{id}")
   @Flush
-  int deleteGroupChat(String id);
+  int deleteGroupChat(@Param("id") String id, @Param("updatedAt") Instant updatedAt);
 }

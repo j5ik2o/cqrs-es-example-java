@@ -1,0 +1,5 @@
+# W1030 is a false positive for the optional VPC parameters: their empty
+# defaults are only read when VpcId is set, and the UsesVpc condition guards
+# the VpcConfig block.
+ignore_checks:
+  - W1030

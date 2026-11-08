@@ -3,12 +3,11 @@ package com.github.j5ik2o.cqrs.es.java.domain.groupchat;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.github.f4b6a3.ulid.Ulid;
 import com.github.f4b6a3.ulid.UlidCreator;
-import com.github.j5ik2o.event.store.adapter.java.AggregateId;
 import io.vavr.control.Either;
 import java.util.Objects;
 import javax.annotation.Nonnull;
 
-public final class GroupChatId implements AggregateId {
+public final class GroupChatId {
 
   private static final String TYPE_NAME = "GroupChat";
 
@@ -20,19 +19,16 @@ public final class GroupChatId implements AggregateId {
   }
 
   @JsonProperty(access = JsonProperty.Access.READ_ONLY)
-  @Override
   @Nonnull
   public String getTypeName() {
     return "GroupChat";
   }
 
-  @Override
   @Nonnull
   public String getValue() {
     return value.toString();
   }
 
-  @Override
   @Nonnull
   public String asString() {
     return String.format("%s-%s", getTypeName(), value);

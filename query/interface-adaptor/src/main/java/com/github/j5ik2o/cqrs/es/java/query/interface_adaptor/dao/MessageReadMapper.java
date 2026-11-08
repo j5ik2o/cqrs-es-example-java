@@ -3,6 +3,7 @@ package com.github.j5ik2o.cqrs.es.java.query.interface_adaptor.dao;
 import java.util.List;
 import java.util.Optional;
 import org.apache.ibatis.annotations.Mapper;
+import org.apache.ibatis.annotations.Param;
 import org.apache.ibatis.annotations.Select;
 
 @Mapper
@@ -14,7 +15,8 @@ public interface MessageReadMapper {
             WHERE gc.disabled = 0 AND m.disabled = 0 AND m.id = #{messageId}
             AND EXISTS (SELECT 1 FROM members AS mem WHERE mem.group_chat_id = m.group_chat_id AND mem.user_account_id = #{userAccountId})
             """)
-  Optional<MessageRecord> getMessage(String messageId, String userAccountId);
+  Optional<MessageRecord> getMessage(
+      @Param("messageId") String messageId, @Param("userAccountId") String userAccountId);
 
   @Select(
       """
@@ -22,6 +24,8 @@ public interface MessageReadMapper {
             FROM group_chats AS gc JOIN messages AS m ON gc.id = m.group_chat_id
             WHERE gc.disabled = 0 AND m.disabled = 0 AND m.group_chat_id = #{groupChatId}
             AND EXISTS (SELECT 1 FROM members AS mem WHERE mem.group_chat_id = m.group_chat_id AND mem.user_account_id = #{userAccountId})
+            ORDER BY m.created_at, m.id
             """)
-  List<MessageRecord> getMessages(String groupChatId, String userAccountId);
+  List<MessageRecord> getMessages(
+      @Param("groupChatId") String groupChatId, @Param("userAccountId") String userAccountId);
 }

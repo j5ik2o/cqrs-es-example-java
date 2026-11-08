@@ -135,6 +135,27 @@ public class GroupChatCommandProcessor {
             });
   }
 
+  public CompletableFuture<GroupChatId> editMessage(
+      GroupChatId id, MessageId messageId, String content, UserAccountId executorId) {
+    return groupChatRepository
+        .findById(id)
+        .thenCompose(
+            groupChatOpt -> {
+              if (groupChatOpt.isEmpty()) {
+                return CompletableFuture.failedFuture(new NotFoundProcessException("not found"));
+              } else {
+                var groupChat = groupChatOpt.get();
+                var groupChatResult = groupChat.editMessage(messageId, content, executorId);
+                return groupChatResult.fold(
+                    CompletableFuture::failedFuture,
+                    groupChatMessageEdited ->
+                        groupChatRepository
+                            .store(groupChatMessageEdited._2, groupChatMessageEdited._1)
+                            .thenApply(ignore -> groupChatMessageEdited._1.getId()));
+              }
+            });
+  }
+
   public CompletableFuture<GroupChatId> deleteMessage(
       GroupChatId id, MessageId messageId, UserAccountId executorId) {
     return groupChatRepository

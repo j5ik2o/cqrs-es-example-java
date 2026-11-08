@@ -3,8 +3,8 @@ services:
   e2e-test:
     image: e2e-test-java:latest
     environment:
-      WRITE_API_SERVER_BASE_URL: http://write-api-server-1:8080
-      READ_API_SERVER_BASE_URL: http://read-api-server-1:8080
+      WRITE_API_SERVER_BASE_URL: http://write-api-server-1:8080/graphql
+      READ_API_SERVER_BASE_URL: http://read-api-server-1:8080/graphql
     depends_on:
       write-api-server-1:
         condition: service_started

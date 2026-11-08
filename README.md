@@ -35,10 +35,16 @@ Please refer to [here](https://github.com/j5ik2o/cqrs-es-example) for implementa
   - API is implemented by GraphQL (Mutation)
   - Event Sourced Aggregate is implemented by [j5ik2o/event-store-adapter-java](https://github.com/j5ik2o/event-store-adapter-java)
 - Read Model Updater
-  - Lambda to build read models based on journals
+  - Builds read models from the head table's DynamoDB Streams
   - Locally, run code that emulates Lambda behavior (local-rmu)
 - Read API Server
   - API is implemented by GraphQL (Query)
+
+The local Read Model Updater subscribes to the head table's Streams. It drops duplicate and stale
+`seq_nr` values, fills a gap from the journal, and records the applied position in
+`read_model_positions` in the same database transaction as the read model update.
+
+The AWS deployment asset and its runbook are in [deploy/README.ja.md](deploy/README.ja.md).
 
 ### System Architecture Diagram
 
@@ -53,6 +59,17 @@ Please refer to [here](https://github.com/j5ik2o/cqrs-es-example) for implementa
 
 - [Debugging on Local Machine](docs/DEBUG_ON_LOCAL_MACHINE.md)
 - [Debugging on Docker Compose](docs/DEBUG_ON_DOCKER_COMPOSE.md)
+
+### End-to-End Test
+
+Build the application image and run the compose stack with LocalStack:
+
+```sh
+./tools/scripts/docker-build.sh
+./tools/scripts/docker-compose-e2e-test.sh
+```
+
+The script starts LocalStack, MySQL, the three applications, and the e2e test container. It returns the e2e test's exit code and prints the compose logs when the test fails. It then restarts the read model updater and runs the test again, so a replay of the retained head Streams must not duplicate the read model.
 
 ## Links
 
