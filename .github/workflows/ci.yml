@@ -24,7 +24,6 @@ jobs:
           java-version: 17
       - uses: gradle/gradle-build-action@v3
         with:
-          gradle-version: 8.3
           arguments: spotlessCheck --info
   deploy-assets:
     runs-on: ubuntu-latest
@@ -47,7 +46,6 @@ jobs:
           java-version: 17
       - uses: gradle/gradle-build-action@v3
         with:
-          gradle-version: 8.3
           arguments: :rmu:lambdaZip --console=plain
       - run: |
           unzip -l rmu/build/distributions/rmu-lambda.zip | grep -F 'com/github/j5ik2o/cqrs/es/java/rmu/ReadModelUpdater.class'
@@ -74,7 +72,6 @@ jobs:
           java-version: ${{ matrix.java }}
       - uses: gradle/gradle-build-action@v3
         with:
-          gradle-version: 8.3
           arguments: test --info
   e2e:
     runs-on: ubuntu-latest
