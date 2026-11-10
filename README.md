@@ -57,6 +57,8 @@ The AWS deployment asset and its runbook are in [deploy/README.ja.md](deploy/REA
 
 ### Local Environment
 
+- [Local application ports and environment variables](docs/LOCAL_CONFIGURATION.md)
+
 - [Debugging on Local Machine](docs/DEBUG_ON_LOCAL_MACHINE.md)
 - [Debugging on Docker Compose](docs/DEBUG_ON_DOCKER_COMPOSE.md)
 

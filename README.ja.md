@@ -55,6 +55,8 @@ Lambda と SQS を使う AWS 向けのデプロイ資産と運用手順は [depl
 
 ### Local Environment
 
+- [ローカル3アプリのポートと環境変数](docs/LOCAL_CONFIGURATION.ja.md)
+
 - [Debugging on Local Machine](docs/DEBUG_ON_LOCAL_MACHINE.ja.md)
 - [Debugging on Docker Compose](docs/DEBUG_ON_DOCKER_COMPOSE.ja.md)
 
