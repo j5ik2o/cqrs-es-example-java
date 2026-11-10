@@ -69,9 +69,21 @@ if [ "${RUN_E2E}" -eq 0 ]; then
   exit 0
 fi
 
+# A failed or empty listing fails the script, so the check never passes without inspecting a container.
 # shellcheck disable=SC2086
-for container in $(docker compose -p cqrs-es-example-java -f ../docker-compose/docker-compose-databases.yml ${F_OPTION} ps -aq); do
-  published=$(docker port "${container}")
+if ! containers=$(docker compose -p cqrs-es-example-java -f ../docker-compose/docker-compose-databases.yml ${F_OPTION} ps -aq); then
+  echo "Error: could not list the e2e stack containers" >&2
+  exit 1
+fi
+if [ -z "${containers}" ]; then
+  echo "Error: the e2e stack has no containers to check" >&2
+  exit 1
+fi
+for container in ${containers}; do
+  if ! published=$(docker port "${container}"); then
+    echo "Error: could not read the published ports of ${container}" >&2
+    exit 1
+  fi
   if [ -n "${published}" ]; then
     echo "Error: $(docker inspect --format '{{.Name}}' "${container}") publishes a host port in the e2e stack: ${published}" >&2
     exit 1

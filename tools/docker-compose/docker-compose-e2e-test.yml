@@ -13,6 +13,12 @@ services:
     ports: !reset []
   read-api-server-1:
     ports: !reset []
+  # The e2e script does not start the two admin UIs. Resetting them keeps the
+  # merged configuration free of host ports whatever services are started.
+  phpmyadmin:
+    ports: !reset []
+  dynamodb-admin:
+    ports: !reset []
   e2e-test:
     image: e2e-test-java:latest
     environment:
