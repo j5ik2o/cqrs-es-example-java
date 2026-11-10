@@ -1,5 +1,18 @@
 version: '3.6'
 services:
+  # The e2e test reaches every service by its name on the compose network.
+  # A fixed host port only adds a bind conflict with other processes on the
+  # host, so reset the port mappings that the other compose files declare.
+  mysql:
+    ports: !reset []
+  localstack:
+    ports: !reset []
+  write-api-server-1:
+    ports: !reset []
+  read-model-updater-1:
+    ports: !reset []
+  read-api-server-1:
+    ports: !reset []
   e2e-test:
     image: e2e-test-java:latest
     environment:

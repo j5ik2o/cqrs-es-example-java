@@ -69,6 +69,15 @@ if [ "${RUN_E2E}" -eq 0 ]; then
   exit 0
 fi
 
+# shellcheck disable=SC2086
+for container in $(docker compose -p cqrs-es-example-java -f ../docker-compose/docker-compose-databases.yml ${F_OPTION} ps -aq); do
+  published=$(docker port "${container}")
+  if [ -n "${published}" ]; then
+    echo "Error: $(docker inspect --format '{{.Name}}' "${container}") publishes a host port in the e2e stack: ${published}" >&2
+    exit 1
+  fi
+done
+
 echo "Running the end-to-end verification"
 # shellcheck disable=SC2086
 docker compose -p cqrs-es-example-java -f ../docker-compose/docker-compose-databases.yml ${F_OPTION} run --rm --no-deps e2e-test
