@@ -37,7 +37,7 @@ class GroupChatRepositoryImplTest {
 
   private static final String SNAPSHOT_AID_INDEX_NAME = "snapshot-aid-index";
 
-  DockerImageName localstackImage = DockerImageName.parse("localstack/localstack:2.1.0");
+  DockerImageName localstackImage = DockerImageName.parse("localstack/localstack:4.14.0");
 
   @Container
   public LocalStackContainer localstack =
