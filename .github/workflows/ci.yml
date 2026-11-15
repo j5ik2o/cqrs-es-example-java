@@ -80,3 +80,15 @@ jobs:
           cd ./tools/e2e-test && make build && cd ../../
           ./tools/scripts/docker-build.sh
           ./tools/scripts/docker-compose-e2e-test.sh
+  aislop:
+    runs-on: ubuntu-latest
+    name: "Run aislop"
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - run: npm ci
+      - run: npm run check:aislop
+      - run: npm run test:aislop

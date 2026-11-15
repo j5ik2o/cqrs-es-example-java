@@ -1,5 +1,6 @@
 HELP.md
 .gradle
+/node_modules/
 build/
 deploy/parameters.json
 !gradle/wrapper/gradle-wrapper.jar
