@@ -1,0 +1,12 @@
+{
+  "name": "cqrs-es-example-java",
+  "private": true,
+  "version": "0.0.0",
+  "scripts": {
+    "check:aislop": "node scripts/aislop-check-bootstrap.mjs check",
+    "test:aislop": "node scripts/aislop-check-bootstrap.mjs test"
+  },
+  "devDependencies": {
+    "aislop": "0.20.1"
+  }
+}
