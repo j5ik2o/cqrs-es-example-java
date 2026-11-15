@@ -1,0 +1,132 @@
+{
+  "engines": [
+    "format",
+    "lint",
+    "code-quality",
+    "ai-slop",
+    "security"
+  ],
+  "missingToolsAllowed": {
+    "ruff": "Python の formatter/linter であり、このリポジトリには導入していない（`command -v ruff` が失敗することを確認）。Python スクリプトは既存の CI 経路で扱うため、aislop 用には導入しない。",
+    "google-java-format": "Java の整形は Spotless の googleJavaFormat() で管理しており、aislop 用の CLI 単体は導入していない（`command -v google-java-format` が失敗することを確認）。",
+    "pmd": "Java の静的解析は既存のビルド/CI 経路で扱っており、pmd は導入していない（`command -v pmd` が失敗することを確認）。"
+  },
+  "accepted": [
+    {
+      "reason": "Python の coding 宣言（`# -*- coding: utf-8 -*-`）を装飾的な区切りコメントと判定した誤検出。宣言は実行時の文字コード指定であり、装飾ではない。",
+      "findings": [
+        {
+          "engine": "ai-slop",
+          "rule": "ai-slop/narrative-comment",
+          "file": ".github/create-release-note-body.py",
+          "message": "Narrative comment block (decorative separator)"
+        },
+        {
+          "engine": "ai-slop",
+          "rule": "ai-slop/narrative-comment",
+          "file": ".github/create-release-note-header.py",
+          "message": "Narrative comment block (decorative separator)"
+        },
+        {
+          "engine": "ai-slop",
+          "rule": "ai-slop/narrative-comment",
+          "file": ".github/next-semver.py",
+          "message": "Narrative comment block (decorative separator)"
+        },
+        {
+          "engine": "ai-slop",
+          "rule": "ai-slop/narrative-comment",
+          "file": ".github/semver-level.py",
+          "message": "Narrative comment block (decorative separator)"
+        }
+      ]
+    },
+    {
+      "reason": "テストがページングを強制するためだけに使う page limit パラメータの Javadoc を cross-reference コメントと判定した誤検出。設計上の不変条件ではなくパラメータの用途説明であり、コードへの参照ではない。",
+      "findings": [
+        {
+          "engine": "ai-slop",
+          "rule": "ai-slop/narrative-comment",
+          "file": "rmu/src/main/java/com/github/j5ik2o/cqrs/es/java/rmu/DynamoDBHeadScanner.java",
+          "message": "Narrative comment block (cross-reference commentary)"
+        }
+      ]
+    },
+    {
+      "reason": "`@Override` 実装であり、生成された GraphQL resolver インターフェース（MutationResolver / QueryResolver）または Spring の CommandLineRunner が `throws Exception` を宣言している。実装はその既存契約に合わせて宣言しており、例外を狭めるには既存 Java コードの変更が必要になるため、AC12 により本タスクでは変更しない。",
+      "findings": [
+        {
+          "engine": "ai-slop",
+          "rule": "ai-slop/java-broad-throws",
+          "file": "bootstrap/src/main/java/com/github/j5ik2o/cqrs/es/java/main/LocalRMUMain.java",
+          "message": "`run` declares `throws Exception`, which hides the exceptions callers must handle"
+        },
+        {
+          "engine": "ai-slop",
+          "rule": "ai-slop/java-broad-throws",
+          "file": "command/interface-adaptor-impl/src/main/java/com/github/j5ik2o/cqrs/es/java/command/interface_adaptor/graphql/MutationResolverImpl.java",
+          "message": "`createGroupChat` declares `throws Exception`, which hides the exceptions callers must handle"
+        },
+        {
+          "engine": "ai-slop",
+          "rule": "ai-slop/java-broad-throws",
+          "file": "command/interface-adaptor-impl/src/main/java/com/github/j5ik2o/cqrs/es/java/command/interface_adaptor/graphql/MutationResolverImpl.java",
+          "message": "`deleteGroupChat` declares `throws Exception`, which hides the exceptions callers must handle"
+        },
+        {
+          "engine": "ai-slop",
+          "rule": "ai-slop/java-broad-throws",
+          "file": "command/interface-adaptor-impl/src/main/java/com/github/j5ik2o/cqrs/es/java/command/interface_adaptor/graphql/MutationResolverImpl.java",
+          "message": "`renameGroupChat` declares `throws Exception`, which hides the exceptions callers must handle"
+        },
+        {
+          "engine": "ai-slop",
+          "rule": "ai-slop/java-broad-throws",
+          "file": "command/interface-adaptor-impl/src/main/java/com/github/j5ik2o/cqrs/es/java/command/interface_adaptor/graphql/MutationResolverImpl.java",
+          "message": "`addMember` declares `throws Exception`, which hides the exceptions callers must handle"
+        },
+        {
+          "engine": "ai-slop",
+          "rule": "ai-slop/java-broad-throws",
+          "file": "command/interface-adaptor-impl/src/main/java/com/github/j5ik2o/cqrs/es/java/command/interface_adaptor/graphql/MutationResolverImpl.java",
+          "message": "`removeMember` declares `throws Exception`, which hides the exceptions callers must handle"
+        },
+        {
+          "engine": "ai-slop",
+          "rule": "ai-slop/java-broad-throws",
+          "file": "command/interface-adaptor-impl/src/main/java/com/github/j5ik2o/cqrs/es/java/command/interface_adaptor/graphql/MutationResolverImpl.java",
+          "message": "`postMessage` declares `throws Exception`, which hides the exceptions callers must handle"
+        },
+        {
+          "engine": "ai-slop",
+          "rule": "ai-slop/java-broad-throws",
+          "file": "command/interface-adaptor-impl/src/main/java/com/github/j5ik2o/cqrs/es/java/command/interface_adaptor/graphql/MutationResolverImpl.java",
+          "message": "`editMessage` declares `throws Exception`, which hides the exceptions callers must handle"
+        },
+        {
+          "engine": "ai-slop",
+          "rule": "ai-slop/java-broad-throws",
+          "file": "command/interface-adaptor-impl/src/main/java/com/github/j5ik2o/cqrs/es/java/command/interface_adaptor/graphql/MutationResolverImpl.java",
+          "message": "`deleteMessage` declares `throws Exception`, which hides the exceptions callers must handle"
+        },
+        {
+          "engine": "ai-slop",
+          "rule": "ai-slop/java-broad-throws",
+          "file": "command/interface-adaptor-impl/src/main/java/com/github/j5ik2o/cqrs/es/java/command/interface_adaptor/graphql/QueryResolverImpl.java",
+          "message": "`healthCheck` declares `throws Exception`, which hides the exceptions callers must handle"
+        }
+      ]
+    },
+    {
+      "reason": "ローカル開発用 docker-compose の固定パスワード（`passwd` / `ceer`）とダミー値（`AWS_SECRET_ACCESS_KEY: x`）を実資格情報と判定した誤検出。実環境の資格情報ではない。",
+      "findings": [
+        {
+          "engine": "security",
+          "rule": "security/hardcoded-secret",
+          "file": "tools/docker-compose/docker-compose-databases.yml",
+          "message": "Possible Database connection string with credentials detected in source code"
+        }
+      ]
+    }
+  ]
+}
