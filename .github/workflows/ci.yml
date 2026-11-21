@@ -1,48 +1,173 @@
-name: CI fixture
+name: CI
 on:
+  push:
+    branches:
+      - main
   pull_request:
-    branches: [main]
+    branches:
+      - main
+    # A base change arrives as edited even when the head SHA stays the same.
+    # Run all checks on metadata edits too, so they never publish a skipped gate.
     types: [opened, synchronize, reopened, edited]
+  schedule:
+    - cron: '0 * * * *'
 jobs:
+  resolve-edited-merge:
+    name: Resolve edited PR test merge
+    if: ${{ github.event_name == 'pull_request' && github.event.action == 'edited' }}
+    runs-on: ubuntu-latest
+    permissions: {}
+    timeout-minutes: 5
+    outputs:
+      sha: ${{ steps.resolve.outputs.sha }}
+    steps:
+      - name: Verify the target base and PR head of the test merge
+        id: resolve
+        shell: bash
+        env:
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          [[ "$PR_NUMBER" =~ ^[1-9][0-9]*$ && "$BASE_SHA" =~ ^[0-9a-f]{40}$ && "$HEAD_SHA" =~ ^[0-9a-f]{40}$ ]]
+          printf 'Event test merge: %s; expected parents: %s %s\n' "$GITHUB_SHA" "$BASE_SHA" "$HEAD_SHA"
+          git init -q "$RUNNER_TEMP/test-merge"
+          cd "$RUNNER_TEMP/test-merge"
+
+          # Reading the PR requests GitHub to refresh its test merge.
+          for attempt in {1..12}; do
+            if sha=$(curl --fail --silent --show-error --max-time 10 "$GITHUB_API_URL/repos/$GITHUB_REPOSITORY/pulls/$PR_NUMBER" |
+              jq -er --arg base "$BASE_SHA" --arg head "$HEAD_SHA" '
+                select(.mergeable == true and .base.sha == $base and .head.sha == $head)
+                | .merge_commit_sha | strings | select(test("^[0-9a-f]{40}$"))
+              ') && git fetch --quiet --no-tags --depth=1 "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY.git" "$sha"; then
+              parents=$(git cat-file -p "$sha" | awk '/^$/ { body = 1 } !body && /^parent / { print $2 }' | paste -sd ' ' -)
+              printf 'Attempt %s: %s parents: %s\n' "$attempt" "$sha" "$parents"
+              if [[ "$parents" == "$BASE_SHA $HEAD_SHA" ]]; then
+                printf 'sha=%s\n' "$sha" >> "$GITHUB_OUTPUT"
+                exit 0
+              fi
+            fi
+            if [[ "$attempt" != 12 ]]; then
+              sleep 5
+            fi
+          done
+          printf '::error::No test merge matched the event base and head\n'
+          exit 1
   lint:
+    needs: resolve-edited-merge
+    if: &check-merge ${{ !cancelled() && (github.event.action != 'edited' || (needs.resolve-edited-merge.result == 'success' && needs.resolve-edited-merge.outputs.sha != '')) }}
+    runs-on: ubuntu-latest
     name: "Run lint"
-    runs-on: ubuntu-24.04
     steps:
-      - run: exit 33
+      - uses: actions/checkout@v7
+        with: &checkout
+          ref: ${{ needs.resolve-edited-merge.outputs.sha }}
+      - uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          java-version: 17
+      - uses: gradle/gradle-build-action@v3
+        with:
+          arguments: spotlessCheck --info
   deploy-assets:
+    runs-on: ubuntu-latest
+    needs: [lint, resolve-edited-merge]
+    if: &check-lint-and-merge ${{ !cancelled() && needs.lint.result == 'success' && (github.event.action != 'edited' || (needs.resolve-edited-merge.result == 'success' && needs.resolve-edited-merge.outputs.sha != '')) }}
     name: "Validate deployment assets"
-    runs-on: ubuntu-24.04
-    needs: lint
     steps:
-      - run: true
+      - uses: actions/checkout@v7
+        with: *checkout
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.13'
+      - run: pip install cfn-lint
+      - run: cfn-lint deploy/rmu-deployment.template.json
+      - run: |
+          bash -n deploy/apply-rmu-deployment.sh
+          bash -n deploy/build-lambda-package.sh
+          bash -n deploy/report-lambda-package-size.sh
+      - uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          java-version: 17
+      - uses: gradle/gradle-build-action@v3
+        with:
+          arguments: :rmu:lambdaZip --console=plain
+      - run: |
+          unzip -l rmu/build/distributions/rmu-lambda.zip | grep -F 'com/github/j5ik2o/cqrs/es/java/rmu/ReadModelUpdater.class'
+          unzip -l rmu/build/distributions/rmu-lambda.zip | grep -F 'com/github/j5ik2o/cqrs/es/java/rmu/RecoveryWorker.class'
+          unzip -l rmu/build/distributions/rmu-lambda.zip | grep -F 'com/github/j5ik2o/cqrs/es/java/rmu/ResyncWorker.class'
+          unzip -l rmu/build/distributions/rmu-lambda.zip | grep -F 'lib/aws-lambda-java-events'
+      - name: Report Lambda package size
+        run: deploy/report-lambda-package-size.sh rmu/build/distributions/rmu-lambda.zip
   test-jdk-17:
+    runs-on: ubuntu-latest
+    needs: [lint, resolve-edited-merge]
+    if: *check-lint-and-merge
+    env: &test-env
+      JAVA_OPTS: -Xms2048M -Xmx2048M -Xss6M -XX:ReservedCodeCacheSize=256M -Dfile.encoding=UTF-8
+      JVM_OPTS:  -Xms2048M -Xmx2048M -Xss6M -XX:ReservedCodeCacheSize=256M -Dfile.encoding=UTF-8
     name: "Run tests with JDK 17"
-    runs-on: ubuntu-24.04
-    needs: lint
     steps:
-      - run: true
+      - uses: actions/checkout@v7
+        with: *checkout
+      - uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          java-version: 17
+      - uses: gradle/gradle-build-action@v3
+        with:
+          arguments: test --info
   test-jdk-25:
+    runs-on: ubuntu-latest
+    needs: [lint, resolve-edited-merge]
+    if: *check-lint-and-merge
+    env: *test-env
     name: "Run tests with JDK 25"
-    runs-on: ubuntu-24.04
-    needs: lint
     steps:
-      - run: true
+      - uses: actions/checkout@v7
+        with: *checkout
+      - uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          java-version: 25
+      - uses: gradle/gradle-build-action@v3
+        with:
+          arguments: test --info
   e2e:
-    name: "e2e"
-    runs-on: ubuntu-24.04
-    needs: lint
+    runs-on: ubuntu-latest
+    needs: [lint, resolve-edited-merge]
+    if: *check-lint-and-merge
     steps:
-      - run: true
+      - uses: actions/checkout@v7
+        with: *checkout
+      - uses: docker/setup-buildx-action@v4
+      - run: |
+          docker buildx create --name amd-arm --driver docker-container --platform linux/amd64
+          cd ./tools/e2e-test && make build && cd ../../
+          ./tools/scripts/docker-build.sh
+          ./tools/scripts/docker-compose-e2e-test.sh
   aislop:
+    needs: resolve-edited-merge
+    if: *check-merge
+    runs-on: ubuntu-latest
     name: "Run aislop"
-    runs-on: ubuntu-24.04
+    timeout-minutes: 15
     steps:
-      - run: true
+      - uses: actions/checkout@v7
+        with: *checkout
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - run: npm ci
+      - run: npm run check:aislop
+      - run: npm run test:aislop
   required-ci:
     name: Required product CI
     if: ${{ always() && github.event_name == 'pull_request' }}
-    needs: [lint, deploy-assets, test-jdk-17, test-jdk-25, e2e, aislop]
-    runs-on: ubuntu-24.04
+    needs: [resolve-edited-merge, lint, deploy-assets, test-jdk-17, test-jdk-25, e2e, aislop]
+    runs-on: ubuntu-latest
     permissions: {}
     timeout-minutes: 5
     steps:
@@ -54,6 +179,9 @@ jobs:
           TEST_JDK_25: ${{ needs.test-jdk-25.result }}
           E2E: ${{ needs.e2e.result }}
           AISLOP: ${{ needs.aislop.result }}
+          PR_ACTION: ${{ github.event.action }}
+          MERGE_RESOLUTION: ${{ needs.resolve-edited-merge.result }}
+          MERGE_SHA: ${{ needs.resolve-edited-merge.outputs.sha }}
         run: |
           failed=0
           for job in LINT DEPLOY_ASSETS TEST_JDK_17 TEST_JDK_25 E2E AISLOP; do
@@ -63,6 +191,12 @@ jobs:
               failed=1
             fi
           done
+          printf 'Merge resolution: %s\n' "${MERGE_RESOLUTION:-missing}"
+          case "$PR_ACTION:$MERGE_RESOLUTION" in
+            edited:success) [[ "$MERGE_SHA" =~ ^[0-9a-f]{40}$ ]] || failed=1 ;;
+            opened:skipped|synchronize:skipped|reopened:skipped) ;;
+            *) failed=1 ;;
+          esac
           [[ "$failed" == 0 ]]
       - name: Reject a cancelled workflow
         if: ${{ cancelled() }}
