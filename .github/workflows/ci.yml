@@ -6,43 +6,43 @@ on:
 jobs:
   lint:
     name: "Run lint"
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
-      - run: true
+      - run: exit 33
   deploy-assets:
     name: "Validate deployment assets"
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     needs: lint
     steps:
       - run: true
   test-jdk-17:
     name: "Run tests with JDK 17"
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     needs: lint
     steps:
       - run: true
   test-jdk-25:
     name: "Run tests with JDK 25"
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     needs: lint
     steps:
-      - run: sleep 180
+      - run: true
   e2e:
     name: "e2e"
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     needs: lint
     steps:
       - run: true
   aislop:
     name: "Run aislop"
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
       - run: true
   required-ci:
     name: Required product CI
     if: ${{ always() && github.event_name == 'pull_request' }}
     needs: [lint, deploy-assets, test-jdk-17, test-jdk-25, e2e, aislop]
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     permissions: {}
     timeout-minutes: 5
     steps:
