@@ -179,7 +179,7 @@ jobs:
           TEST_JDK_25: ${{ needs.test-jdk-25.result }}
           E2E: ${{ needs.e2e.result }}
           AISLOP: ${{ needs.aislop.result }}
-          EDITED: ${{ github.event.action == 'edited' }}
+          PR_ACTION: ${{ github.event.action }}
           MERGE_RESOLUTION: ${{ needs.resolve-edited-merge.result }}
           MERGE_SHA: ${{ needs.resolve-edited-merge.outputs.sha }}
         run: |
@@ -192,9 +192,9 @@ jobs:
             fi
           done
           printf 'Merge resolution: %s\n' "${MERGE_RESOLUTION:-missing}"
-          case "$EDITED:$MERGE_RESOLUTION" in
-            true:success) [[ "$MERGE_SHA" =~ ^[0-9a-f]{40}$ ]] || failed=1 ;;
-            false:skipped) ;;
+          case "$PR_ACTION:$MERGE_RESOLUTION" in
+            edited:success) [[ "$MERGE_SHA" =~ ^[0-9a-f]{40}$ ]] || failed=1 ;;
+            opened:skipped|synchronize:skipped|reopened:skipped) ;;
             *) failed=1 ;;
           esac
           [[ "$failed" == 0 ]]
