@@ -76,3 +76,5 @@ The script starts LocalStack, MySQL, the three applications, and the e2e test co
 ## Links
 
 - [Common Documents](https://github.com/j5ik2o/cqrs-es-example)
+
+<!-- Temporary CI evidence fixture. -->
