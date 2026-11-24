@@ -12,57 +12,83 @@ on:
   schedule:
     - cron: '0 * * * *'
 jobs:
-  resolve-edited-merge:
-    name: Resolve edited PR test merge
-    if: ${{ github.event_name == 'pull_request' && github.event.action == 'edited' }}
+  checkout-revision:
+    name: Resolve the PR test merge
     runs-on: ubuntu-latest
-    permissions: {}
     timeout-minutes: 5
+    permissions:
+      contents: read
+      pull-requests: read
     outputs:
-      sha: ${{ steps.resolve.outputs.sha }}
+      ref: ${{ steps.resolve.outputs.checkout_ref }}
+      test_merge: ${{ steps.resolve.outputs.test_merge }}
+      bundle: ${{ steps.resolve.outputs.bundle_name }}
     steps:
-      - name: Verify the target base and PR head of the test merge
+      # Load the resolver from the revision that defines this workflow; a PR
+      # branch that predates it does not have the script.
+      - uses: actions/checkout@v7
+        if: ${{ github.event_name == 'pull_request' }}
+        with:
+          ref: ${{ github.workflow_sha }}
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Test the test merge resolution
+        if: ${{ github.event_name == 'pull_request' }}
+        run: node --test .github/scripts/pr-test-merge.test.mjs
+      # Check the current base tip and PR head, not the event's base SHA.
+      - name: Resolve the PR's test merge
         id: resolve
-        shell: bash
+        if: ${{ github.event_name == 'pull_request' }}
         env:
           PR_NUMBER: ${{ github.event.pull_request.number }}
-          BASE_SHA: ${{ github.event.pull_request.base.sha }}
-          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
-        run: |
-          [[ "$PR_NUMBER" =~ ^[1-9][0-9]*$ && "$BASE_SHA" =~ ^[0-9a-f]{40}$ && "$HEAD_SHA" =~ ^[0-9a-f]{40}$ ]]
-          printf 'Event test merge: %s; expected parents: %s %s\n' "$GITHUB_SHA" "$BASE_SHA" "$HEAD_SHA"
-          git init -q "$RUNNER_TEMP/test-merge"
-          cd "$RUNNER_TEMP/test-merge"
-
-          # Reading the PR requests GitHub to refresh its test merge.
-          for attempt in {1..12}; do
-            if sha=$(curl --fail --silent --show-error --max-time 10 "$GITHUB_API_URL/repos/$GITHUB_REPOSITORY/pulls/$PR_NUMBER" |
-              jq -er --arg base "$BASE_SHA" --arg head "$HEAD_SHA" '
-                select(.mergeable == true and .base.sha == $base and .head.sha == $head)
-                | .merge_commit_sha | strings | select(test("^[0-9a-f]{40}$"))
-              ') && git fetch --quiet --no-tags --depth=1 "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY.git" "$sha"; then
-              parents=$(git cat-file -p "$sha" | awk '/^$/ { body = 1 } !body && /^parent / { print $2 }' | paste -sd ' ' -)
-              printf 'Attempt %s: %s parents: %s\n' "$attempt" "$sha" "$parents"
-              if [[ "$parents" == "$BASE_SHA $HEAD_SHA" ]]; then
-                printf 'sha=%s\n' "$sha" >> "$GITHUB_OUTPUT"
-                exit 0
-              fi
-            fi
-            if [[ "$attempt" != 12 ]]; then
-              sleep 5
-            fi
-          done
-          printf '::error::No test merge matched the event base and head\n'
-          exit 1
+          EVENT_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          GH_TOKEN: ${{ github.token }}
+        run: .github/scripts/pr-test-merge.sh
+      - uses: actions/upload-artifact@v7
+        if: ${{ steps.resolve.outputs.bundle_name != '' }}
+        with:
+          name: ${{ steps.resolve.outputs.bundle_name }}
+          path: ${{ runner.temp }}/pr-test-merge.bundle
+          if-no-files-found: error
+          # After expiry, re-run all jobs so this job builds the bundle again.
+          retention-days: 1
   lint:
-    needs: resolve-edited-merge
-    if: &check-merge ${{ !cancelled() && (github.event.action != 'edited' || (needs.resolve-edited-merge.result == 'success' && needs.resolve-edited-merge.outputs.sha != '')) }}
+    needs: checkout-revision
     runs-on: ubuntu-latest
     name: "Run lint"
     steps:
-      - uses: actions/checkout@v7
-        with: &checkout
-          ref: ${{ needs.resolve-edited-merge.outputs.sha }}
+      - &checkout
+        uses: actions/checkout@v7
+        with:
+          ref: ${{ needs.checkout-revision.outputs.ref }}
+          # The bundle of a locally built test merge needs the base history.
+          fetch-depth: ${{ needs.checkout-revision.outputs.bundle != '' && '0' || '1' }}
+          persist-credentials: false
+      - &download-test-merge
+        uses: actions/download-artifact@v7
+        if: ${{ needs.checkout-revision.outputs.bundle != '' }}
+        with:
+          name: ${{ needs.checkout-revision.outputs.bundle }}
+          path: ${{ runner.temp }}/pr-test-merge
+      - &verify-test-merge
+        name: Verify the checked out test merge
+        if: ${{ github.event_name == 'pull_request' }}
+        shell: bash
+        env:
+          TEST_MERGE: ${{ needs.checkout-revision.outputs.test_merge }}
+          BUNDLE: ${{ needs.checkout-revision.outputs.bundle }}
+        run: |
+          if [[ -n "$BUNDLE" ]]; then
+            git fetch --quiet --no-tags "$RUNNER_TEMP/pr-test-merge/pr-test-merge.bundle" refs/pr-ci/merge
+            git checkout --quiet --detach FETCH_HEAD
+          fi
+          # A shallow checkout hides parents from %P; the commit object keeps them.
+          actual="$(git rev-parse HEAD)$(git cat-file commit HEAD | awk '!NF { exit } $1 == "parent" { printf " %s", $2 }')"
+          printf 'Checked out test merge (SHA, base, head): %s\n' "$actual"
+          if [[ -z "$TEST_MERGE" || "$actual" != "$TEST_MERGE" ]]; then
+            printf '::error::Expected test merge %s\n' "${TEST_MERGE:-missing}"
+            exit 1
+          fi
       - uses: actions/setup-java@v6
         with:
           distribution: temurin
@@ -72,12 +98,12 @@ jobs:
           arguments: spotlessCheck --info
   deploy-assets:
     runs-on: ubuntu-latest
-    needs: [lint, resolve-edited-merge]
-    if: &check-lint-and-merge ${{ !cancelled() && needs.lint.result == 'success' && (github.event.action != 'edited' || (needs.resolve-edited-merge.result == 'success' && needs.resolve-edited-merge.outputs.sha != '')) }}
+    needs: [lint, checkout-revision]
     name: "Validate deployment assets"
     steps:
-      - uses: actions/checkout@v7
-        with: *checkout
+      - *checkout
+      - *download-test-merge
+      - *verify-test-merge
       - uses: actions/setup-python@v6
         with:
           python-version: '3.13'
@@ -103,15 +129,15 @@ jobs:
         run: deploy/report-lambda-package-size.sh rmu/build/distributions/rmu-lambda.zip
   test-jdk-17:
     runs-on: ubuntu-latest
-    needs: [lint, resolve-edited-merge]
-    if: *check-lint-and-merge
+    needs: [lint, checkout-revision]
     env: &test-env
       JAVA_OPTS: -Xms2048M -Xmx2048M -Xss6M -XX:ReservedCodeCacheSize=256M -Dfile.encoding=UTF-8
       JVM_OPTS:  -Xms2048M -Xmx2048M -Xss6M -XX:ReservedCodeCacheSize=256M -Dfile.encoding=UTF-8
     name: "Run tests with JDK 17"
     steps:
-      - uses: actions/checkout@v7
-        with: *checkout
+      - *checkout
+      - *download-test-merge
+      - *verify-test-merge
       - uses: actions/setup-java@v6
         with:
           distribution: temurin
@@ -121,13 +147,13 @@ jobs:
           arguments: test --info
   test-jdk-25:
     runs-on: ubuntu-latest
-    needs: [lint, resolve-edited-merge]
-    if: *check-lint-and-merge
+    needs: [lint, checkout-revision]
     env: *test-env
     name: "Run tests with JDK 25"
     steps:
-      - uses: actions/checkout@v7
-        with: *checkout
+      - *checkout
+      - *download-test-merge
+      - *verify-test-merge
       - uses: actions/setup-java@v6
         with:
           distribution: temurin
@@ -137,11 +163,11 @@ jobs:
           arguments: test --info
   e2e:
     runs-on: ubuntu-latest
-    needs: [lint, resolve-edited-merge]
-    if: *check-lint-and-merge
+    needs: [lint, checkout-revision]
     steps:
-      - uses: actions/checkout@v7
-        with: *checkout
+      - *checkout
+      - *download-test-merge
+      - *verify-test-merge
       - uses: docker/setup-buildx-action@v4
       - run: |
           docker buildx create --name amd-arm --driver docker-container --platform linux/amd64
@@ -149,14 +175,14 @@ jobs:
           ./tools/scripts/docker-build.sh
           ./tools/scripts/docker-compose-e2e-test.sh
   aislop:
-    needs: resolve-edited-merge
-    if: *check-merge
+    needs: checkout-revision
     runs-on: ubuntu-latest
     name: "Run aislop"
     timeout-minutes: 15
     steps:
-      - uses: actions/checkout@v7
-        with: *checkout
+      - *checkout
+      - *download-test-merge
+      - *verify-test-merge
       - uses: actions/setup-node@v4
         with:
           node-version: 24
@@ -166,7 +192,7 @@ jobs:
   required-ci:
     name: Required product CI
     if: ${{ always() && github.event_name == 'pull_request' }}
-    needs: [resolve-edited-merge, lint, deploy-assets, test-jdk-17, test-jdk-25, e2e, aislop]
+    needs: [checkout-revision, lint, deploy-assets, test-jdk-17, test-jdk-25, e2e, aislop]
     runs-on: ubuntu-latest
     permissions: {}
     timeout-minutes: 5
@@ -179,24 +205,16 @@ jobs:
           TEST_JDK_25: ${{ needs.test-jdk-25.result }}
           E2E: ${{ needs.e2e.result }}
           AISLOP: ${{ needs.aislop.result }}
-          PR_ACTION: ${{ github.event.action }}
-          MERGE_RESOLUTION: ${{ needs.resolve-edited-merge.result }}
-          MERGE_SHA: ${{ needs.resolve-edited-merge.outputs.sha }}
+          CHECKOUT_REVISION: ${{ needs.checkout-revision.result }}
         run: |
           failed=0
-          for job in LINT DEPLOY_ASSETS TEST_JDK_17 TEST_JDK_25 E2E AISLOP; do
+          for job in CHECKOUT_REVISION LINT DEPLOY_ASSETS TEST_JDK_17 TEST_JDK_25 E2E AISLOP; do
             result=${!job}
             printf '%s: %s\n' "$job" "${result:-missing}"
             if [[ "$result" != success ]]; then
               failed=1
             fi
           done
-          printf 'Merge resolution: %s\n' "${MERGE_RESOLUTION:-missing}"
-          case "$PR_ACTION:$MERGE_RESOLUTION" in
-            edited:success) [[ "$MERGE_SHA" =~ ^[0-9a-f]{40}$ ]] || failed=1 ;;
-            opened:skipped|synchronize:skipped|reopened:skipped) ;;
-            *) failed=1 ;;
-          esac
           [[ "$failed" == 0 ]]
       - name: Reject a cancelled workflow
         if: ${{ cancelled() }}
