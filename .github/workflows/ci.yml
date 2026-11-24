@@ -6,6 +6,7 @@ on:
   pull_request:
     branches:
       - main
+      - ci-verify-648-base
     # A base change arrives as edited even when the head SHA stays the same.
     # Run all checks on metadata edits too, so they never publish a skipped gate.
     types: [opened, synchronize, reopened, edited]
