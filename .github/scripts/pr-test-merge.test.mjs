@@ -6,8 +6,9 @@ import { chmodSync, existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { test } from "node:test";
+import { fileURLToPath } from "node:url";
 
-const root = new URL("../..", import.meta.url).pathname;
+const root = fileURLToPath(new URL("../..", import.meta.url));
 const script = join(root, ".github/scripts/pr-test-merge.sh");
 const workflow = readFileSync(join(root, ".github/workflows/ci.yml"), "utf8");
 
@@ -50,7 +51,12 @@ function fixture(t) {
 
   const bin = join(dir, "bin");
   execFileSync("mkdir", [bin]);
-  writeFileSync(join(bin, "gh"), '#!/bin/sh\nprintf \'%s\\n\' "$FIXTURE_PR"\n');
+  // FIXTURE_GH_FAILS lists the call numbers (e.g. " 1 6 ") at which the API read fails.
+  const calls = join(dir, "gh-calls");
+  writeFileSync(
+    join(bin, "gh"),
+    `#!/bin/sh\necho >> '${calls}'\nn=$(wc -l < '${calls}' | tr -d ' ')\ncase "$FIXTURE_GH_FAILS" in *" $n "*) exit 1;; esac\nprintf '%s\\n' "$FIXTURE_PR"\n`,
+  );
   writeFileSync(join(bin, "sleep"), "#!/bin/sh\n");
   chmodSync(join(bin, "gh"), 0o755);
   chmodSync(join(bin, "sleep"), 0o755);
@@ -58,6 +64,7 @@ function fixture(t) {
   const output = join(dir, "output");
   const resolve = ({ pr = `open\tmain\t${head}`, eventHead = head, env = {} } = {}) => {
     rmSync(output, { force: true });
+    rmSync(calls, { force: true });
     const result = spawnSync("bash", [script], {
       cwd: runner,
       encoding: "utf8",
@@ -160,6 +167,22 @@ test("checks the tip of the PR's current base branch after a retarget", (t) => {
   const r = f.resolve({ pr: `open\trelease\t${f.head}` });
   assert.equal(r.status, 0, r.log);
   assert.deepEqual(parentsOf(r.outputs), { base: f.oldBase, head: f.head });
+});
+
+test("retries a failed PR read and fails when the last attempt cannot read the PR", (t) => {
+  const f = fixture(t);
+  const candidate = f.merge(f.base, f.head);
+  f.push({ "refs/pull/1/merge": candidate });
+  const retried = f.resolve({ env: { FIXTURE_GH_FAILS: " 1 2 " } });
+  assert.equal(retried.status, 0, retried.log);
+  assert.match(retried.log, /Attempt 2: cannot read PR 1/);
+  assert.equal(retried.outputs.sha, candidate);
+
+  f.push({ "refs/pull/1/merge": f.merge(f.oldBase, f.head) });
+  const exhausted = f.resolve({ env: { FIXTURE_GH_FAILS: " 6 " } });
+  assert.notEqual(exhausted.status, 0);
+  assert.match(exhausted.log, /Cannot read PR 1 in the last attempt/);
+  assert.equal(exhausted.outputs, null);
 });
 
 test("fails an event whose head is no longer the PR head", (t) => {

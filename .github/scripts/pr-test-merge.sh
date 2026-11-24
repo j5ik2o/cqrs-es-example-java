@@ -17,11 +17,18 @@ if [[ ! "$PR_NUMBER" =~ ^[1-9][0-9]*$ || ! "$EVENT_HEAD_SHA" =~ $sha40 ]]; then
   exit 1
 fi
 
+read_ok=
 for (( attempt = 1; attempt <= attempts; attempt++ )); do
   if (( attempt > 1 )); then sleep 5; fi
-  # Reading the PR also asks GitHub to recompute refs/pull/N/merge.
-  current=$(gh api "$GITHUB_API_URL/repos/$GITHUB_REPOSITORY/pulls/$PR_NUMBER" \
-    --jq '[.state, .base.ref, .head.sha] | @tsv')
+  # Reading the PR also asks GitHub to recompute refs/pull/N/merge. A failed
+  # read uses up one attempt; the last attempt must read the PR.
+  read_ok=
+  if ! current=$(gh api "$GITHUB_API_URL/repos/$GITHUB_REPOSITORY/pulls/$PR_NUMBER" \
+    --jq '[.state, .base.ref, .head.sha] | @tsv'); then
+    printf '::warning::Attempt %s: cannot read PR %s\n' "$attempt" "$PR_NUMBER"
+    continue
+  fi
+  read_ok=1
   IFS=$'\t' read -r state base_ref head_sha <<< "$current"
   if [[ "$state" != open || "$head_sha" != "$EVENT_HEAD_SHA" ]]; then
     printf '::error::This event is for head %s, but the PR is %s with head %s\n' \
@@ -50,6 +57,10 @@ for (( attempt = 1; attempt <= attempts; attempt++ )); do
     exit 0
   fi
 done
+if [[ -z "$read_ok" ]]; then
+  printf '::error::Cannot read PR %s in the last attempt\n' "$PR_NUMBER"
+  exit 1
+fi
 
 # Build the merge from the parents read in the last attempt, so every product
 # job checks the same commit even if a branch moves again.
