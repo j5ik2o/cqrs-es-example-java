@@ -1,6 +1,6 @@
 package com.github.j5ik2o.cqrs.es.java.main;
 
-import lombok.Getter;
+import   lombok.Getter;
 import lombok.Setter;
 import lombok.ToString;
 import org.springframework.boot.context.properties.ConfigurationProperties;
